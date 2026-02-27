@@ -81,6 +81,16 @@ Started: Fri Feb 27 09:38:44 PST 2026
   - The on_track_end callback for auto-advance uses run_coroutine_threadsafe; skip testing this path with pragma no cover
 ---
 
+## 2026-02-27 - US-006
+- Wrote 12 integration tests for pause/resume commands (RED phase: 10 failed; GREEN phase: all pass)
+- Implemented `pause` command: checks `vm.is_playing()`; replies "Nothing is currently playing." or calls `vm.pause()` and replies "Paused."
+- Implemented `resume` command: checks `vm.is_paused()`; replies "Playback is not paused." or calls `vm.resume()` and replies "Resumed."
+- Files changed: bot/cogs/music.py, tests/integration/test_controls.py
+- **Learnings for future iterations:**
+  - pause/resume tests use `_make_cog_with_vm(vc)` helper that pre-injects a VoiceManager with a live `_voice_client` so is_playing/is_paused return correct values
+  - When bot has no VoiceManager for a guild yet, `_get_voice_manager()` creates a disconnected one; `is_playing()` and `is_paused()` both return False safely
+---
+
 ## 2026-02-27 - US-002
 - Wrote 20 unit tests for AudioResolver (RED phase: all failed; GREEN phase: all pass)
 - Implemented AudioResolver with dependency injection (`ytdl_class`, `spotipy_client` constructor params)

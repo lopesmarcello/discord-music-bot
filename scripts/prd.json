@@ -88,7 +88,7 @@
     {
       "id": "US-006",
       "title": "pause and resume commands (RED/GREEN)",
-      "passes": false,
+      "passes": true,
       "description": "As a server member, I want to pause and resume playback so I can take breaks without losing my place.",
       "acceptanceCriteria": [
         "RED: Write failing tests before implementation",

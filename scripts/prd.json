@@ -18,7 +18,7 @@
     {
       "id": "US-002",
       "title": "Remove Spotify resolution code from resolver",
-      "passes": false,
+      "passes": true,
       "description": "As a developer, I want to remove all Spotify-specific logic from bot/audio/resolver.py so that the codebase no longer references the Spotify API.",
       "acceptanceCriteria": [
         "_SPOTIFY_RE regex pattern removed from resolver.py",
@@ -33,7 +33,7 @@
     {
       "id": "US-003",
       "title": "Return helpful error when Spotify URL is pasted",
-      "passes": false,
+      "passes": true,
       "description": "As a user, I want to receive a clear message when I paste a Spotify URL so that I know the bot doesn't support it and what to do instead.",
       "acceptanceCriteria": [
         "When resolve() receives a Spotify URL (https://open.spotify.com/...), it raises UnsupportedSourceError",
@@ -46,7 +46,7 @@
     {
       "id": "US-004",
       "title": "Remove Spotify unit tests",
-      "passes": false,
+      "passes": true,
       "description": "As a developer, I want to remove all Spotify-related test cases so that the test suite no longer references removed code.",
       "acceptanceCriteria": [
         "TestResolveSpotify test class removed from tests/unit/test_resolver.py",

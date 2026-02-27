@@ -272,3 +272,32 @@ class TestPlayMessages:
         ctx = _make_ctx()
         asyncio.run(cog.play(ctx, query="test"))
         ctx.defer.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Unsupported URL error handling (US-003)
+# ---------------------------------------------------------------------------
+
+class TestPlayUnsupportedUrl:
+    def test_unsupported_url_sends_error_reply(self):
+        bot = MagicMock()
+        bot.loop = asyncio.new_event_loop()
+        mock_resolver = MagicMock()
+        mock_resolver.resolve.side_effect = UnsupportedSourceError("Unsupported URL: https://open.spotify.com/track/abc")
+        cog = Music(bot, resolver=mock_resolver)
+        ctx = _make_ctx()
+        asyncio.run(cog.play(ctx, query="https://open.spotify.com/track/abc"))
+        ctx.send.assert_called_once()
+        message = ctx.send.call_args[0][0]
+        assert "not supported" in message.lower()
+
+    def test_unsupported_url_does_not_add_to_queue(self):
+        bot = MagicMock()
+        bot.loop = asyncio.new_event_loop()
+        mock_resolver = MagicMock()
+        mock_resolver.resolve.side_effect = UnsupportedSourceError("Unsupported URL: https://open.spotify.com/track/abc")
+        cog = Music(bot, resolver=mock_resolver)
+        ctx = _make_ctx()
+        asyncio.run(cog.play(ctx, query="https://open.spotify.com/track/abc"))
+        queue = cog._queue_registry.get_queue(GUILD_ID)
+        assert len(queue.list()) == 0

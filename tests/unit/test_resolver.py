@@ -1,4 +1,4 @@
-"""Unit tests for AudioResolver (US-002)."""
+"""Unit tests for AudioResolver."""
 from __future__ import annotations
 
 import pytest
@@ -93,61 +93,19 @@ class TestResolveYouTube:
 
 
 # ---------------------------------------------------------------------------
-# AudioResolver – Spotify URL
+# AudioResolver – Spotify URL (now unsupported)
 # ---------------------------------------------------------------------------
 
 class TestResolveSpotify:
-    def _make_resolver(self, search_info=None):
-        """Return a resolver with mocked ytdl (for search) and spotipy."""
-        if search_info is None:
-            search_info = _search_info("Artist - Title")
-        mock_ytdl = _make_mock_ydl_class(search_info)
+    def test_spotify_url_raises_unsupported_source_error(self):
+        resolver = AudioResolver(ytdl_class=MagicMock())
+        with pytest.raises(UnsupportedSourceError):
+            resolver.resolve("https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC")
 
-        mock_sp = MagicMock()
-        mock_sp.track.return_value = {
-            "name": "Never Gonna Give You Up",
-            "artists": [{"name": "Rick Astley"}],
-        }
-        return AudioResolver(ytdl_class=mock_ytdl, spotipy_client=mock_sp), mock_sp
-
-    def test_spotify_url_returns_audio_track(self):
-        resolver, _ = self._make_resolver()
-        track = resolver.resolve("https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC")
-        assert isinstance(track, AudioTrack)
-        assert track.source == "spotify"
-
-    def test_spotify_url_is_preserved(self):
-        spotify_url = "https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC"
-        resolver, _ = self._make_resolver()
-        track = resolver.resolve(spotify_url)
-        assert track.url == spotify_url
-
-    def test_spotify_fetches_metadata_from_spotipy(self):
-        resolver, mock_sp = self._make_resolver()
-        resolver.resolve("https://open.spotify.com/track/abc123")
-        mock_sp.track.assert_called_once_with("abc123")
-
-    def test_spotify_builds_search_query_from_metadata(self):
-        mock_ytdl = _make_mock_ydl_class(_search_info())
-        mock_sp = MagicMock()
-        mock_sp.track.return_value = {
-            "name": "Never Gonna Give You Up",
-            "artists": [{"name": "Rick Astley"}],
-        }
-        resolver = AudioResolver(ytdl_class=mock_ytdl, spotipy_client=mock_sp)
-        resolver.resolve("https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC")
-        # extract_info should have been called with a search query
-        mock_ydl = mock_ytdl.return_value.__enter__.return_value
-        call_args = mock_ydl.extract_info.call_args
-        search_arg = call_args[0][0]
-        assert "Rick Astley" in search_arg
-        assert "Never Gonna Give You Up" in search_arg
-
-    def test_spotify_url_with_query_params_stripped(self):
-        spotify_url = "https://open.spotify.com/track/abc123?si=xyz"
-        resolver, mock_sp = self._make_resolver()
-        resolver.resolve(spotify_url)
-        mock_sp.track.assert_called_once_with("abc123")
+    def test_spotify_url_with_query_params_raises(self):
+        resolver = AudioResolver(ytdl_class=MagicMock())
+        with pytest.raises(UnsupportedSourceError):
+            resolver.resolve("https://open.spotify.com/track/abc123?si=xyz")
 
 
 # ---------------------------------------------------------------------------
@@ -282,19 +240,3 @@ class TestGetYtdlClassLazyImport:
         assert result is mock_ytdl_module.YoutubeDL
 
 
-# ---------------------------------------------------------------------------
-# AudioResolver – _get_spotipy_client lazy-import path
-# ---------------------------------------------------------------------------
-
-class TestGetSpotipyClientLazyImport:
-    def test_lazy_import_when_spotipy_client_not_provided(self):
-        """When spotipy_client is None, resolver imports spotipy from sys.modules."""
-        mock_spotipy_module = MagicMock()
-        mock_oauth2_module = MagicMock()
-        with patch.dict(
-            "sys.modules",
-            {"spotipy": mock_spotipy_module, "spotipy.oauth2": mock_oauth2_module},
-        ):
-            resolver = AudioResolver()
-            client = resolver._get_spotipy_client()
-        assert client is mock_spotipy_module.Spotify.return_value

@@ -8,7 +8,7 @@ import discord
 from discord.ext import commands
 
 from bot.audio.queue import GuildQueueRegistry
-from bot.audio.resolver import AudioResolver
+from bot.audio.resolver import AudioResolver, UnsupportedSourceError
 from bot.audio.voice import VoiceManager
 
 if TYPE_CHECKING:
@@ -86,7 +86,14 @@ class Music(commands.Cog):
             await vm.join(ctx.author.voice.channel)
             vm.set_on_track_end(self._make_on_track_end(ctx.guild.id))
 
-        track = self._resolver.resolve(query)
+        try:
+            track = self._resolver.resolve(query)
+        except UnsupportedSourceError:
+            await ctx.send(
+                "That URL is not supported. Try searching by song name instead,"
+                " e.g. `/play artist - song title`."
+            )
+            return
         queue = self._queue_registry.get_queue(ctx.guild.id)
         queue.add(track)
 

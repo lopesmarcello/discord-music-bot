@@ -131,9 +131,16 @@ class Music(commands.Cog):
 
     @commands.hybrid_command(name="stop", description="Stop playback and disconnect")
     async def stop(self, ctx: commands.Context) -> None:
-        """Stop playback and clear queue."""
-        # Implementation in US-008
-        await ctx.send("Stop command not yet implemented.")
+        """Stop playback, clear queue, and disconnect."""
+        vm = self._get_voice_manager(ctx.guild.id)
+        if not vm.is_connected():
+            await ctx.send("I'm not in a voice channel.")
+            return
+        vm.stop()
+        queue = self._queue_registry.get_queue(ctx.guild.id)
+        queue.clear()
+        await vm.leave()
+        await ctx.send("Stopped and disconnected.")
 
     @commands.hybrid_command(name="queue", description="View the current song queue")
     async def queue(self, ctx: commands.Context) -> None:

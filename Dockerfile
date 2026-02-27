@@ -2,14 +2,14 @@ FROM python:3.12-slim
 
 # Install FFmpeg and system dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get install -y --no-install-recommends ffmpeg libsodium23 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Copy dependency manifest and install Python dependencies
 COPY pyproject.toml .
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir .
 
 # Copy bot source
 COPY bot/ bot/

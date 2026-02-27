@@ -1,50 +1,22 @@
-# Ralph Progress Log
-Started: Fri Feb 27 11:08:31 PST 2026
----
-
 ## Codebase Patterns
-- pytest must be run with `PYTHONPATH=/tmp/pypackages python3.11 -m pytest` (packages bootstrapped from GitHub in prior PRD run; PyPI not accessible)
-- pypackages at /tmp/pypackages contains: pytest, pluggy, packaging, iniconfig, pygments (no pytest-asyncio)
-- AudioResolver uses dependency injection (`ytdl_class` constructor param) — no sys.modules hacking needed in tests
-- `UnsupportedSourceError` is raised for any unrecognised https/http URL that doesn't match YouTube or SoundCloud
-- Spotify URLs now raise `UnsupportedSourceError`; music cog catches it and sends a user-friendly reply
-
+- Use `discord.py[voice]>=2.0` (not bare `discord.py>=2.0`) so PyNaCl is installed via the voice extras
+- Dockerfile base image is `python:3.12-slim`; must add `libsodium23` to apt-get for PyNaCl native linking
+- Tests mock all discord.VoiceClient interactions - no real voice connection needed to run tests
+- pyproject.toml uses `setuptools.build_meta` build backend; use `pip install .` (not `-e .`) in Docker
 ---
 
-## 2026-02-27 - US-001
-- Removed `spotipy` from `dependencies` in `pyproject.toml`
-- Removed `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` entries from `.env.example`
-- Created new `scripts/prd.json` for the Remove Spotify Integration PRD (5 stories)
-- All 136 existing tests continue to pass (Spotify tests use mock injection so don't require spotipy installed)
-- Files changed: pyproject.toml, .env.example, scripts/prd.json, scripts/progress.txt
-- **Learnings for future iterations:**
-  - The Spotify tests (TestResolveSpotify, TestGetSpotipyClientLazyImport) still pass even without spotipy installed because they use mock injection and `patch.dict("sys.modules", ...)`
-  - US-002, US-003, US-004 must be implemented together in one commit: removing Spotify code (US-002) will break TestResolveSpotify (US-004 must follow immediately)
-  - US-005 (README/docs cleanup) can be done independently
+# Ralph Progress Log
+Started: Fri Feb 27 15:38:49 PST 2026
 ---
 
-## 2026-02-27 - US-002 / US-003 / US-004
-- Removed `_SPOTIFY_RE`, `_resolve_spotify()`, `_get_spotipy_client()`, `_spotipy_client` from resolver.py
-- Removed `spotipy_client=None` param from `AudioResolver.__init__`; removed `typing.Optional` import
-- Removed Spotify dispatch branch from `resolve()`; Spotify URLs now fall through to `_URL_RE` and raise `UnsupportedSourceError`
-- Added `UnsupportedSourceError` import to music.py; wrapped `self._resolver.resolve(query)` in try/except in play command
-- Added user-facing error reply: "That URL is not supported. Try searching by song name instead, e.g. `/play artist - song title`."
-- Replaced `TestResolveSpotify` (5 old Spotify-pass tests) with 2 new tests verifying Spotify URLs raise `UnsupportedSourceError`
-- Removed `TestGetSpotipyClientLazyImport` class entirely
-- Added `TestPlayUnsupportedUrl` integration tests (2 tests) verifying error reply and no queue addition
-- Files changed: bot/audio/resolver.py, bot/cogs/music.py, tests/unit/test_resolver.py, tests/integration/test_play_command.py, scripts/prd.json
-- Test count: 136 → 134 (removed 6 old, added 4 new)
+## 2026-02-27 - US-001 / US-002
+- Initialized new PRD (prd-fix-pynacl-voice-dependency.md → scripts/prd.json) for PyNaCl missing dependency fix
+- US-001: Changed `discord.py>=2.0` to `discord.py[voice]>=2.0` in pyproject.toml to pull in PyNaCl via the voice extras
+- US-002: Added `libsodium23` to apt-get install line in Dockerfile alongside ffmpeg
+- Files changed: pyproject.toml, Dockerfile, scripts/prd.json, scripts/progress.txt
 - **Learnings for future iterations:**
-  - Spotify URLs match `_URL_RE` (https://) after Spotify branch removed, so they raise `UnsupportedSourceError` naturally
-  - When removing a feature, replace feature-specific tests with tests that verify the feature is now rejected
-  - `UnsupportedSourceError` must be imported in music.py to use in try/except
----
-
-## 2026-02-27 - US-005
-- Removed all Spotify references from README.md: updated description, features list, setup section (removed SPOTIFY env vars from .env example and Getting Credentials guide), and Supported Sources section
-- Added a note in Supported Sources explaining Spotify URLs are unsupported and directing users to search by song name
-- .env.example was already cleaned up in US-001
-- Files changed: README.md, scripts/prd.json, scripts/progress.txt
-- **Learnings for future iterations:**
-  - When removing a feature, check: description, features list, setup/config docs, supported sources, and any credential setup guides
+  - The `[voice]` extra on discord.py is the idiomatic way to include PyNaCl; it pins a compatible version automatically
+  - `libsodium23` is the correct Debian/Ubuntu package name for the shared library PyNaCl links against
+  - All tests use MagicMock for VoiceClient so no actual PyNaCl import is needed at test time
+  - US-003 (end-to-end Docker smoke test) requires a running Docker daemon and Discord bot token; cannot be auto-verified in this environment - manual verification needed
 ---

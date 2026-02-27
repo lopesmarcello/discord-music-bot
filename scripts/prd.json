@@ -1,70 +1,39 @@
 {
-  "title": "Remove Spotify Integration",
+  "title": "Fix PyNaCl Missing Dependency for Discord Voice",
   "branchName": "ralph/discord-music-bot",
-  "description": "Remove all Spotify integration from the Discord music bot. The spotipy library and Spotify API credentials are unnecessary since Spotify only ever provided metadata while audio came from YouTube. This change eliminates the dependency, removes all Spotify-specific code, and directs users to search by song name instead.",
+  "description": "The Discord music bot crashes with `RuntimeError: PyNaCl library needed in order to use voice` whenever a user runs `/play`. `discord.py` requires `PyNaCl` for all voice channel operations (encryption of the audio stream). The library is missing from `pyproject.toml` and therefore never installed into the Docker image.",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Remove spotipy dependency and env vars",
+      "title": "Add PyNaCl to Python dependencies",
       "passes": true,
-      "description": "As a developer, I want to remove the spotipy package and Spotify credentials from the project so that the bot has no dependency on the Spotify API.",
+      "description": "As a developer, I want PyNaCl declared in pyproject.toml so it is installed automatically in every environment (local, CI, Docker).",
       "acceptanceCriteria": [
-        "spotipy removed from dependencies in pyproject.toml",
-        "SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET removed from .env.example",
-        "Running pip install -e . does not install spotipy",
-        "Typecheck passes"
+        "Change 'discord.py>=2.0' to 'discord.py[voice]>=2.0' in pyproject.toml (the [voice] extra pulls in PyNaCl as a declared transitive dependency)",
+        "pip install . in a clean virtualenv succeeds and python -c 'import nacl' exits without error"
       ]
     },
     {
       "id": "US-002",
-      "title": "Remove Spotify resolution code from resolver",
+      "title": "Add libsodium system package to the Dockerfile",
       "passes": true,
-      "description": "As a developer, I want to remove all Spotify-specific logic from bot/audio/resolver.py so that the codebase no longer references the Spotify API.",
+      "description": "As a developer, I want the Docker image to include the libsodium system library so PyNaCl can link against it reliably on Debian/Ubuntu-based images.",
       "acceptanceCriteria": [
-        "_SPOTIFY_RE regex pattern removed from resolver.py",
-        "_resolve_spotify() method removed from AudioResolver",
-        "_get_spotipy_client() method removed from AudioResolver",
-        "_spotipy_client instance variable removed from AudioResolver.__init__",
-        "All import spotipy / from spotipy statements removed",
-        "The resolve() dispatch method no longer has a Spotify branch",
-        "Typecheck passes"
+        "libsodium23 is added to the apt-get install line in Dockerfile alongside ffmpeg",
+        "docker build . completes without errors",
+        "docker run starts the bot without import errors related to nacl/libsodium"
       ]
     },
     {
       "id": "US-003",
-      "title": "Return helpful error when Spotify URL is pasted",
-      "passes": true,
-      "description": "As a user, I want to receive a clear message when I paste a Spotify URL so that I know the bot doesn't support it and what to do instead.",
+      "title": "End-to-end smoke verification",
+      "passes": false,
+      "description": "As a developer, I want to confirm that a rebuilt container lets the bot join a voice channel so the fix is verified in the real runtime environment.",
       "acceptanceCriteria": [
-        "When resolve() receives a Spotify URL (https://open.spotify.com/...), it raises UnsupportedSourceError",
-        "The music cog catches the error and replies with a message such as: Spotify URLs are not supported. Try searching by song name, e.g. /play artist - song title",
-        "The error message is sent as a Discord reply (not silent)",
-        "Other unsupported URLs are unaffected",
-        "Typecheck passes"
-      ]
-    },
-    {
-      "id": "US-004",
-      "title": "Remove Spotify unit tests",
-      "passes": true,
-      "description": "As a developer, I want to remove all Spotify-related test cases so that the test suite no longer references removed code.",
-      "acceptanceCriteria": [
-        "TestResolveSpotify test class removed from tests/unit/test_resolver.py",
-        "No remaining references to spotipy, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, or _resolve_spotify in any test file",
-        "All remaining tests continue to pass",
-        "Typecheck passes"
-      ]
-    },
-    {
-      "id": "US-005",
-      "title": "Remove Spotify from documentation and config",
-      "passes": true,
-      "description": "As a developer, I want all project documentation and config templates to reflect that Spotify is no longer supported so that new users aren't confused by references to removed features.",
-      "acceptanceCriteria": [
-        "README.md no longer mentions Spotify, SPOTIFY_CLIENT_ID, or SPOTIFY_CLIENT_SECRET",
-        ".env.example does not include Spotify credential entries",
-        "README documents that Spotify URLs are not supported and users should search by song name",
-        "Typecheck passes"
+        "docker compose up --build rebuilds the image successfully",
+        "Bot starts and connects to the Discord gateway",
+        "Running /play does NOT produce RuntimeError: PyNaCl library needed in order to use voice",
+        "Bot joins the voice channel and begins audio playback"
       ]
     }
   ]

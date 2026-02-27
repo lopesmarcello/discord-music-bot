@@ -34,6 +34,7 @@ class Music(commands.Cog):
         self._voice_managers: dict[int, VoiceManager] = (
             voice_managers if voice_managers is not None else {}
         )
+        self._current_tracks: dict[int, object] = {}
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -60,7 +61,9 @@ class Music(commands.Cog):
         queue = self._queue_registry.get_queue(guild_id)
         track = queue.next()
         if track is None:
+            self._current_tracks[guild_id] = None
             return
+        self._current_tracks[guild_id] = track
         vm = self._get_voice_manager(guild_id)
         await vm.play(track.stream_url)
 
@@ -139,11 +142,36 @@ class Music(commands.Cog):
         vm.stop()
         queue = self._queue_registry.get_queue(ctx.guild.id)
         queue.clear()
+        self._current_tracks[ctx.guild.id] = None
         await vm.leave()
         await ctx.send("Stopped and disconnected.")
 
     @commands.hybrid_command(name="queue", description="View the current song queue")
     async def queue(self, ctx: commands.Context) -> None:
         """Display the current queue."""
-        # Implementation in US-009
-        await ctx.send("Queue command not yet implemented.")
+        guild_queue = self._queue_registry.get_queue(ctx.guild.id)
+        current = self._current_tracks.get(ctx.guild.id)
+        tracks = guild_queue.list()
+
+        if current is None and not tracks:
+            await ctx.send("The queue is empty.")
+            return
+
+        embed = discord.Embed(title="Music Queue")
+        lines = []
+
+        if current is not None:
+            lines.append(f"**Now Playing:** {current.title}")
+            if tracks:
+                lines.append("")
+
+        displayed = tracks[:10]
+        for i, track in enumerate(displayed, 1):
+            lines.append(f"{i}. {track.title}")
+
+        remaining = len(tracks) - 10
+        if remaining > 0:
+            lines.append(f"...and {remaining} more")
+
+        embed.description = "\n".join(lines)
+        await ctx.send(embed=embed)

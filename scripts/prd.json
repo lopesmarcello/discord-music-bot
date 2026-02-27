@@ -70,7 +70,7 @@
     {
       "id": "US-005",
       "title": "play command (RED/GREEN)",
-      "passes": false,
+      "passes": true,
       "description": "As a server member, I want to play a song by URL or search query so I can listen to music in a voice channel.",
       "acceptanceCriteria": [
         "RED: Write failing integration tests with a mocked Discord context/interaction before implementation",

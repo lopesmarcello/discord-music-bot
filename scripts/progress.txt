@@ -19,6 +19,11 @@ Started: Fri Feb 27 09:38:44 PST 2026
 - VoiceManager uses dependency injection: `VoiceManager(ffmpeg_source_class=...)` for testability; discord.FFmpegPCMAudio lazy-imported with `# pragma: no cover`
 - discord.VoiceClient mock: use `AsyncMock()` for async methods (`connect`, `disconnect`), `MagicMock()` for sync methods (`play`, `pause`, `resume`, `stop`, `is_playing`, `is_paused`)
 - To simulate FFmpeg "after" callback (track end): capture `vc.play.call_args[1]["after"]` then call it with `None` (success) or an Exception
+- discord / discord.ext.commands are NOT installed; mock them in tests/integration/conftest.py using sys.modules before any bot cog imports
+- Music cog uses dependency injection: `Music(bot, resolver=..., queue_registry=..., ffmpeg_source_class=...)` for testability
+- Integration tests use `asyncio.run(cog.command(ctx, ...))` directly; ctx.send and ctx.defer are AsyncMock; ctx.author.voice is None for "not in voice" tests
+- VoiceManager.is_connected() returns True when _voice_client is not None; used by Music cog to avoid re-joining
+- on_track_end callback body uses asyncio.run_coroutine_threadsafe; marked `# pragma: no cover` since it requires a running event loop
 
 ---
 
@@ -58,6 +63,22 @@ Started: Fri Feb 27 09:38:44 PST 2026
   - `channel.connect = AsyncMock(return_value=vc)` and `vc.disconnect = AsyncMock()` for Discord async methods
   - The FFmpeg "after" callback is captured from `vc.play.call_args[1]["after"]` and called manually to simulate track end
   - `VoiceManager.FFMPEG_BEFORE_OPTIONS` and `VoiceManager.FFMPEG_OPTIONS` are class-level constants for reconnect config
+---
+
+## 2026-02-27 - US-005
+- Wrote 16 integration tests for play command (RED phase: TypeError on import; GREEN phase: all pass)
+- Added `VoiceManager.is_connected()` method to bot/audio/voice.py
+- Rewrote Music cog constructor to accept injected deps: `resolver`, `queue_registry`, `ffmpeg_source_class`, `voice_managers`
+- Implemented `play` command with: voice channel check, auto-join, resolver call, queue add, immediate play vs queue logic
+- Added `_get_voice_manager()`, `_make_on_track_end()`, `_play_next()` helpers to Music cog
+- Created `tests/integration/conftest.py` to mock discord/discord.ext.commands before cog imports
+- Files changed: bot/audio/voice.py, bot/cogs/music.py, tests/integration/test_play_command.py, tests/integration/conftest.py
+- **Learnings for future iterations:**
+  - Integration tests for Discord cogs need conftest.py that patches sys.modules for discord BEFORE import
+  - conftest.py must provide real Python classes for `commands.Cog` (base class) and stub `hybrid_command` as a pass-through decorator
+  - Music cog _voice_managers dict is keyed by guild_id (int); use `_get_voice_manager(guild_id)` to get/create per-guild VoiceManager
+  - `_play_next()` pops the front track from the queue and calls vm.play(); called when queue has tracks and bot is idle
+  - The on_track_end callback for auto-advance uses run_coroutine_threadsafe; skip testing this path with pragma no cover
 ---
 
 ## 2026-02-27 - US-002

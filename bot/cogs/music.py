@@ -116,8 +116,18 @@ class Music(commands.Cog):
     @commands.hybrid_command(name="skip", description="Skip the current song")
     async def skip(self, ctx: commands.Context) -> None:
         """Skip to the next track."""
-        # Implementation in US-007
-        await ctx.send("Skip command not yet implemented.")
+        vm = self._get_voice_manager(ctx.guild.id)
+        if not vm.is_playing() and not vm.is_paused():
+            await ctx.send("Nothing to skip.")
+            return
+        vm.stop()
+        queue = self._queue_registry.get_queue(ctx.guild.id)
+        next_track = queue.peek()
+        await self._play_next(ctx.guild.id)
+        if next_track is not None:
+            await ctx.send(f"Skipped. Now playing: **{next_track.title}**")
+        else:
+            await ctx.send("Skipped. Queue is empty.")
 
     @commands.hybrid_command(name="stop", description="Stop playback and disconnect")
     async def stop(self, ctx: commands.Context) -> None:

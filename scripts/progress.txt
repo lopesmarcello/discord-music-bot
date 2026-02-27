@@ -1,0 +1,45 @@
+# Ralph Progress Log
+Started: Fri Feb 27 09:38:44 PST 2026
+---
+
+## Codebase Patterns
+- pytest must be run with `PYTHONPATH=/tmp/pypackages` since packages cannot be installed system-wide (no pip, no PyPI access in this environment)
+- Packages were bootstrapped from GitHub: pytest wheel from GitHub releases, pluggy/packaging/pygments cloned from GitHub and extracted to /tmp/pypackages
+- pluggy requires a dist-info directory to report its version; created manually at /tmp/pypackages/pluggy-1.6.0.dist-info/
+- The environment uses Python 3.11.2 on Debian with EXTERNALLY-MANAGED flag; use --target or custom PYTHONPATH for package management
+- GitHub is accessible (allowed by firewall); PyPI is NOT accessible
+- All bot modules are in bot/ with stubs raising NotImplementedError until their story is implemented
+- Tests are in tests/unit/ (pure unit tests) and tests/integration/ (mocked Discord tests)
+- AudioResolver uses dependency injection: `AudioResolver(ytdl_class=..., spotipy_client=...)` for testability; production deps lazy-imported with `# pragma: no cover`
+- yt_dlp / spotipy are not installed; mock them via `unittest.mock.patch.dict("sys.modules", {...})` or inject mocks at constructor time
+- yt_dlp search queries wrap results in `{"entries": [...]}` – resolver unwraps `entries[0]` automatically
+- `MagicMock` supports context manager protocol natively; access the `with` block value via `mock_class.return_value.__enter__.return_value`
+
+---
+
+## 2026-02-27 - US-001
+- Created full project scaffold: pyproject.toml, .env.example, .gitignore, README.md
+- Created directory structure: bot/, bot/cogs/, bot/audio/, tests/unit/, tests/integration/
+- Created stub modules: bot/audio/resolver.py (AudioResolver, AudioTrack, UnsupportedSourceError), bot/audio/queue.py (Queue), bot/audio/voice.py (VoiceManager), bot/cogs/music.py (Music cog with all commands as stubs), bot/bot.py, bot/__main__.py
+- Created placeholder test files for all future stories
+- Created tests/test_scaffold.py with 5 passing smoke tests
+- Created scripts/prd.json with all 10 user stories (US-001 marked passes: true)
+- Files changed: pyproject.toml, .env.example, .gitignore, README.md, bot/*, tests/*
+- **Learnings for future iterations:**
+  - No pip available system-wide; packages must be bootstrapped from GitHub and put in /tmp/pypackages
+  - Run pytest as: `PYTHONPATH=/tmp/pypackages python3 -m pytest`
+  - asyncio_mode config option requires pytest-asyncio installed; removed from pyproject.toml until US-004/005
+  - The `pyproject.toml` has `asyncio_mode` removed for now - add it back in US-004 when pytest-asyncio is bootstrapped
+---
+
+## 2026-02-27 - US-002
+- Wrote 20 unit tests for AudioResolver (RED phase: all failed; GREEN phase: all pass)
+- Implemented AudioResolver with dependency injection (`ytdl_class`, `spotipy_client` constructor params)
+- Files changed: bot/audio/resolver.py, tests/unit/test_resolver.py
+- Patterns covered: YouTube URL, Spotify URL (Spotipy metadata + YouTube fallback), SoundCloud URL, plain search, unsupported URL
+- **Learnings for future iterations:**
+  - Use `AudioResolver(ytdl_class=mock, spotipy_client=mock)` in all resolver tests – no sys.modules hacking needed for functional tests
+  - Test lazy-import paths by pre-populating `sys.modules` with mocks and calling `_get_ytdl_class()` / `_get_spotipy_client()` directly
+  - yt_dlp wraps search results: info dict has `"entries"` key; resolver handles this in `_extract_info()`
+  - MagicMock context manager: ydl instance accessible via `mock_class.return_value.__enter__.return_value`
+---

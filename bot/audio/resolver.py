@@ -1,7 +1,9 @@
 """Audio source resolver for YouTube, Spotify, and SoundCloud."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from typing import Optional
 
 
 class UnsupportedSourceError(Exception):
@@ -19,8 +21,86 @@ class AudioTrack:
     source: str  # "youtube", "spotify", "soundcloud", "search"
 
 
+# URL detection patterns
+_YOUTUBE_RE = re.compile(r"^https?://(www\.)?(youtube\.com|youtu\.be)/")
+_SPOTIFY_RE = re.compile(r"^https://open\.spotify\.com/track/")
+_SOUNDCLOUD_RE = re.compile(r"^https?://(www\.)?soundcloud\.com/")
+_URL_RE = re.compile(r"^https?://")
+
+
 class AudioResolver:
     """Resolves user queries and URLs into playable AudioTrack instances."""
+
+    def __init__(self, ytdl_class=None, spotipy_client=None) -> None:
+        self._ytdl_class = ytdl_class
+        self._spotipy_client = spotipy_client
+
+    # ------------------------------------------------------------------
+    # Dependency accessors (lazy-import for production; injectable for tests)
+    # ------------------------------------------------------------------
+
+    def _get_ytdl_class(self):
+        if self._ytdl_class is not None:
+            return self._ytdl_class
+        import yt_dlp  # pragma: no cover
+        return yt_dlp.YoutubeDL  # pragma: no cover
+
+    def _get_spotipy_client(self):
+        if self._spotipy_client is not None:
+            return self._spotipy_client
+        import spotipy  # pragma: no cover
+        from spotipy.oauth2 import SpotifyClientCredentials  # pragma: no cover
+        import os  # pragma: no cover
+        return spotipy.Spotify(  # pragma: no cover
+            auth_manager=SpotifyClientCredentials(
+                client_id=os.environ.get("SPOTIFY_CLIENT_ID", ""),
+                client_secret=os.environ.get("SPOTIFY_CLIENT_SECRET", ""),
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _extract_info(self, url_or_query: str) -> dict:
+        """Run yt_dlp extraction and return the info dict for a single entry."""
+        YoutubeDL = self._get_ytdl_class()
+        ydl_opts = {"format": "bestaudio/best", "noplaylist": True, "quiet": True}
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url_or_query, download=False)
+        # Search queries return a wrapper dict with an 'entries' list
+        if info and "entries" in info:
+            info = info["entries"][0]
+        return info
+
+    def _make_track(self, info: dict, original_url: str, source: str) -> AudioTrack:
+        return AudioTrack(
+            title=info["title"],
+            url=info.get("webpage_url", original_url),
+            stream_url=info["url"],
+            duration=info.get("duration", 0),
+            source=source,
+        )
+
+    # ------------------------------------------------------------------
+    # Spotify-specific resolution
+    # ------------------------------------------------------------------
+
+    def _resolve_spotify(self, url: str) -> AudioTrack:
+        sp = self._get_spotipy_client()
+        # Extract track ID, stripping any query params
+        track_id = url.split("/track/")[-1].split("?")[0]
+        track_info = sp.track(track_id)
+        artists = ", ".join(a["name"] for a in track_info["artists"])
+        search_query = f"{artists} - {track_info['name']}"
+        info = self._extract_info(f"ytsearch1:{search_query}")
+        track = self._make_track(info, url, "spotify")
+        track.url = url  # preserve original Spotify URL
+        return track
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def resolve(self, query: str) -> AudioTrack:
         """Resolve a query or URL to an AudioTrack.
@@ -32,6 +112,23 @@ class AudioResolver:
             An AudioTrack with stream information.
 
         Raises:
-            UnsupportedSourceError: If the URL is unrecognised.
+            UnsupportedSourceError: If the URL scheme is recognised but the
+                platform is not supported.
         """
-        raise NotImplementedError("AudioResolver.resolve() not yet implemented (US-002)")
+        if _YOUTUBE_RE.match(query):
+            info = self._extract_info(query)
+            return self._make_track(info, query, "youtube")
+
+        if _SPOTIFY_RE.match(query):
+            return self._resolve_spotify(query)
+
+        if _SOUNDCLOUD_RE.match(query):
+            info = self._extract_info(query)
+            return self._make_track(info, query, "soundcloud")
+
+        if _URL_RE.match(query):
+            raise UnsupportedSourceError(f"Unsupported URL: {query}")
+
+        # Plain search string → search YouTube
+        info = self._extract_info(f"ytsearch1:{query}")
+        return self._make_track(info, query, "search")

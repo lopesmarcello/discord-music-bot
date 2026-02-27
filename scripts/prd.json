@@ -1,0 +1,158 @@
+{
+  "title": "Discord Music Bot (Python)",
+  "branchName": "ralph/discord-music-bot",
+  "description": "A self-hosted Discord music bot written in Python that allows server members to stream audio from YouTube, Spotify, and SoundCloud into voice channels.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Project scaffold and CI setup",
+      "passes": true,
+      "description": "As a developer, I need a clean project structure with dependencies, linting, and a test runner configured so I can begin TDD immediately.",
+      "acceptanceCriteria": [
+        "pyproject.toml includes discord.py, yt-dlp, spotipy, pytest, pytest-asyncio, pytest-cov, python-dotenv",
+        "pytest runs with zero errors on an empty test suite",
+        "README.md documents how to run tests and the bot locally",
+        ".env.example lists all required environment variables"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Audio source resolver (RED/GREEN)",
+      "passes": true,
+      "description": "As a developer, I need a source resolver that accepts a user query or URL and returns a playable audio stream URL so the bot can support multiple platforms uniformly.",
+      "acceptanceCriteria": [
+        "RED: Write failing tests for AudioResolver.resolve(query) before implementation",
+        "resolve() accepts a YouTube URL and returns an AudioTrack",
+        "resolve() accepts a Spotify track URL, fetches metadata via Spotipy, and falls back to YouTube search",
+        "resolve() accepts a SoundCloud URL and returns a valid AudioTrack",
+        "resolve() accepts a plain search string and returns the top YouTube result",
+        "resolve() raises UnsupportedSourceError for unrecognised URLs",
+        "GREEN: All resolver unit tests pass with mocked yt-dlp and spotipy calls",
+        "Coverage for AudioResolver is 100%"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Queue data structure (RED/GREEN)",
+      "passes": false,
+      "description": "As a developer, I need an in-memory queue per guild so songs can be added, peeked at, skipped, and cleared without touching Discord or audio systems.",
+      "acceptanceCriteria": [
+        "RED: Write failing tests for Queue class before implementation",
+        "Queue.add(track) appends a track",
+        "Queue.next() removes and returns the front track; returns None if empty",
+        "Queue.peek() returns the front track without removing it",
+        "Queue.clear() empties the queue",
+        "Queue.list() returns a copy of all tracks in order",
+        "Queue is isolated per guild ID (keyed by guild_id)",
+        "GREEN: All queue unit tests pass",
+        "Coverage for Queue is 100%"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Voice connection manager (RED/GREEN)",
+      "passes": false,
+      "description": "As a developer, I need a voice connection manager that joins/leaves voice channels and plays audio so playback logic is decoupled from command handling.",
+      "acceptanceCriteria": [
+        "RED: Write failing tests using mocked discord.VoiceClient before implementation",
+        "VoiceManager.join(channel) connects to a voice channel",
+        "VoiceManager.leave() disconnects and clears state",
+        "VoiceManager.play(stream_url) starts audio playback using FFmpeg",
+        "VoiceManager.pause() pauses currently playing audio",
+        "VoiceManager.resume() resumes paused audio",
+        "VoiceManager.stop() stops audio without disconnecting",
+        "VoiceManager.is_playing() and VoiceManager.is_paused() return correct booleans",
+        "After a track ends, VoiceManager automatically calls a registered on_track_end callback",
+        "GREEN: All voice manager integration tests pass with mocked Discord voice client",
+        "Coverage for VoiceManager is 100%"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "play command (RED/GREEN)",
+      "passes": false,
+      "description": "As a server member, I want to play a song by URL or search query so I can listen to music in a voice channel.",
+      "acceptanceCriteria": [
+        "RED: Write failing integration tests with a mocked Discord context/interaction before implementation",
+        "Slash command /play <query> is registered and callable",
+        "Prefix command !play <query> works identically",
+        "If the user is not in a voice channel, the bot replies with an error message",
+        "If the bot is not yet in a voice channel, it joins the user's channel automatically",
+        "The resolved AudioTrack is added to the guild queue",
+        "If nothing is currently playing, playback starts immediately",
+        "If something is already playing, the track is queued",
+        "GREEN: All play command tests pass",
+        "Coverage for play command handler is >= 90%"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "pause and resume commands (RED/GREEN)",
+      "passes": false,
+      "description": "As a server member, I want to pause and resume playback so I can take breaks without losing my place.",
+      "acceptanceCriteria": [
+        "RED: Write failing tests before implementation",
+        "/pause and !pause pause currently playing audio; bot replies Paused.",
+        "/resume and !resume resume paused audio; bot replies Resumed.",
+        "If nothing is playing, pause replies with Nothing is currently playing.",
+        "If not paused, resume replies with Playback is not paused.",
+        "GREEN: All pause/resume tests pass"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "skip command (RED/GREEN)",
+      "passes": false,
+      "description": "As a server member, I want to skip the current song so I can move to the next track in the queue.",
+      "acceptanceCriteria": [
+        "RED: Write failing tests before implementation",
+        "/skip and !skip stop the current track and play the next one in the queue",
+        "Bot replies with Skipped. Now playing: {next_title} if a next track exists",
+        "Bot replies with Skipped. Queue is empty. if the queue is now empty",
+        "If nothing is playing, bot replies Nothing to skip.",
+        "GREEN: All skip tests pass"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "stop command (RED/GREEN)",
+      "passes": false,
+      "description": "As a server member, I want to stop playback and clear the queue so I can end the music session.",
+      "acceptanceCriteria": [
+        "RED: Write failing tests before implementation",
+        "/stop and !stop stop audio, clear the queue, and disconnect the bot",
+        "Bot replies Stopped and disconnected.",
+        "If not in a voice channel, bot replies I'm not in a voice channel.",
+        "GREEN: All stop tests pass"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "queue command (RED/GREEN)",
+      "passes": false,
+      "description": "As a server member, I want to view the current song queue so I know what is coming up.",
+      "acceptanceCriteria": [
+        "RED: Write failing tests before implementation",
+        "/queue and !queue display an embed listing all queued tracks",
+        "The currently playing track is shown at the top labelled Now Playing",
+        "If queue and current track are both empty, bot replies The queue is empty.",
+        "Queue embed shows a maximum of 10 tracks; if more exist, shows ...and N more",
+        "GREEN: All queue display tests pass"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Dockerfile and deployment config",
+      "passes": false,
+      "description": "As a server admin, I need a Dockerfile so I can run the bot on a VPS without installing Python directly.",
+      "acceptanceCriteria": [
+        "Dockerfile uses a slim Python base image (e.g., python:3.12-slim)",
+        "FFmpeg is installed inside the image",
+        "Bot starts with CMD [\"python\", \"-m\", \"bot\"] or equivalent",
+        ".dockerignore excludes .env, __pycache__, .git",
+        "docker build completes without errors",
+        "README.md documents the full Docker deployment steps"
+      ]
+    }
+  ]
+}

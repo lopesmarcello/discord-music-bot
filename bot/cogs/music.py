@@ -96,14 +96,22 @@ class Music(commands.Cog):
     @commands.hybrid_command(name="pause", description="Pause currently playing audio")
     async def pause(self, ctx: commands.Context) -> None:
         """Pause playback."""
-        # Implementation in US-006
-        await ctx.send("Pause command not yet implemented.")
+        vm = self._get_voice_manager(ctx.guild.id)
+        if not vm.is_playing():
+            await ctx.send("Nothing is currently playing.")
+            return
+        vm.pause()
+        await ctx.send("Paused.")
 
     @commands.hybrid_command(name="resume", description="Resume paused audio")
     async def resume(self, ctx: commands.Context) -> None:
         """Resume playback."""
-        # Implementation in US-006
-        await ctx.send("Resume command not yet implemented.")
+        vm = self._get_voice_manager(ctx.guild.id)
+        if not vm.is_paused():
+            await ctx.send("Playback is not paused.")
+            return
+        vm.resume()
+        await ctx.send("Resumed.")
 
     @commands.hybrid_command(name="skip", description="Skip the current song")
     async def skip(self, ctx: commands.Context) -> None:

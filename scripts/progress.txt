@@ -122,3 +122,17 @@ Started: Fri Feb 27 09:38:44 PST 2026
   - Order of operations: stop() → clear() → leave() — stop audio before disconnecting to avoid FFmpeg errors
   - `vm.leave()` sets `_voice_client = None`, so `vm.is_connected()` returns False after the command runs
 ---
+
+## 2026-02-27 - US-009
+- Wrote 9 integration tests for queue command (RED phase: 8 failed; GREEN phase: all pass)
+- Added `_current_tracks: dict[int, object]` to Music cog constructor to track the currently playing track per guild
+- Updated `_play_next()` to store the popped track in `_current_tracks[guild_id]`
+- Updated `stop` command to clear `_current_tracks[guild_id] = None` after stopping
+- Implemented `queue` command: empty check → plain text reply; otherwise builds discord.Embed with `description` containing "Now Playing" + numbered queue entries (max 10) + "...and N more" if needed
+- Files changed: bot/cogs/music.py, tests/integration/test_queue_command.py
+- **Learnings for future iterations:**
+  - `discord.Embed` is a MagicMock in tests; setting `embed.description = "..."` in implementation means tests can assert `embed.description == "..."` directly
+  - Retrieve the embed in tests from `ctx.send.call_args[1]["embed"]` — avoids shared-mock contamination
+  - Putting all queue content in a single `embed.description` string (vs. multiple `add_field` calls) is simpler to test and avoids mock call-count accumulation issues
+  - _current_tracks must be initialised in `__init__` and updated in `_play_next` and `stop`; skip doesn't need updating because it calls `_play_next` which updates the current track
+---

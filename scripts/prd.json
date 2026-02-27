@@ -129,7 +129,7 @@
     {
       "id": "US-009",
       "title": "queue command (RED/GREEN)",
-      "passes": false,
+      "passes": true,
       "description": "As a server member, I want to view the current song queue so I know what is coming up.",
       "acceptanceCriteria": [
         "RED: Write failing tests before implementation",

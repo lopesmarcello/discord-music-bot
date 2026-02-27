@@ -102,7 +102,7 @@
     {
       "id": "US-007",
       "title": "skip command (RED/GREEN)",
-      "passes": false,
+      "passes": true,
       "description": "As a server member, I want to skip the current song so I can move to the next track in the queue.",
       "acceptanceCriteria": [
         "RED: Write failing tests before implementation",

@@ -91,6 +91,16 @@ Started: Fri Feb 27 09:38:44 PST 2026
   - When bot has no VoiceManager for a guild yet, `_get_voice_manager()` creates a disconnected one; `is_playing()` and `is_paused()` both return False safely
 ---
 
+## 2026-02-27 - US-007
+- Wrote 10 integration tests for skip command (RED phase: 8 failed; GREEN phase: all pass)
+- Implemented `skip` command: checks `vm.is_playing()` or `vm.is_paused()`; replies "Nothing to skip." or calls `vm.stop()`, peeks queue, calls `_play_next()`, replies "Skipped. Now playing: {title}" or "Skipped. Queue is empty."
+- Files changed: bot/cogs/music.py, tests/integration/test_skip_command.py
+- **Learnings for future iterations:**
+  - Use `queue.peek()` before `_play_next()` to get the next track title for the reply message without consuming the track twice
+  - Skip checks both `is_playing()` AND `is_paused()` — paused audio should also be skippable
+  - The currently playing track has already been popped from the queue; the queue holds upcoming tracks
+---
+
 ## 2026-02-27 - US-002
 - Wrote 20 unit tests for AudioResolver (RED phase: all failed; GREEN phase: all pass)
 - Implemented AudioResolver with dependency injection (`ytdl_class`, `spotipy_client` constructor params)

@@ -27,7 +27,7 @@
     {
       "id": "US-003",
       "title": "End-to-end smoke verification",
-      "passes": false,
+      "passes": true,
       "description": "As a developer, I want to confirm that a rebuilt container lets the bot join a voice channel so the fix is verified in the real runtime environment.",
       "acceptanceCriteria": [
         "docker compose up --build rebuilds the image successfully",

@@ -75,47 +75,33 @@ pytest tests/integration/
 
 ### Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) installed on your VPS or local machine
+- [Docker](https://docs.docker.com/get-docker/) with the Compose plugin installed on your VPS or local machine
 - A configured `.env` file (copy from `.env.example` and fill in credentials)
 
-### Build the image
+### Start the bot
 
 ```bash
-docker build -t discord-music-bot .
+docker compose up -d --build
 ```
 
-### Run the container
-
-```bash
-docker run --env-file .env discord-music-bot
-```
-
-### Run in the background (detached)
-
-```bash
-docker run -d --name music-bot --restart unless-stopped --env-file .env discord-music-bot
-```
+This builds the image and starts the container in the background with `restart: unless-stopped`.
 
 ### View logs
 
 ```bash
-docker logs -f music-bot
+docker compose logs -f
 ```
 
-### Stop / restart the bot
+### Stop the bot
 
 ```bash
-docker stop music-bot
-docker start music-bot
+docker compose down
 ```
 
 ### Update to a new version
 
 ```bash
-docker stop music-bot
-docker rm music-bot
-docker build -t discord-music-bot .
-docker run -d --name music-bot --restart unless-stopped --env-file .env discord-music-bot
+docker compose up -d --build
 ```
 
 **Note:** Make sure your `.env` file is configured with valid credentials before running. Never commit `.env` to version control.

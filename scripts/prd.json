@@ -51,7 +51,7 @@
     {
       "id": "US-004",
       "title": "Voice connection manager (RED/GREEN)",
-      "passes": false,
+      "passes": true,
       "description": "As a developer, I need a voice connection manager that joins/leaves voice channels and plays audio so playback logic is decoupled from command handling.",
       "acceptanceCriteria": [
         "RED: Write failing tests using mocked discord.VoiceClient before implementation",

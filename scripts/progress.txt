@@ -15,6 +15,10 @@ Started: Fri Feb 27 09:38:44 PST 2026
 - yt_dlp search queries wrap results in `{"entries": [...]}` – resolver unwraps `entries[0]` automatically
 - `MagicMock` supports context manager protocol natively; access the `with` block value via `mock_class.return_value.__enter__.return_value`
 - GuildQueueRegistry (in bot/audio/queue.py) manages per-guild Queue instances; use `registry.get_queue(guild_id)` in command handlers
+- pytest-asyncio is NOT installed; test async methods using `asyncio.run(coroutine)` directly in test functions (no decorators needed)
+- VoiceManager uses dependency injection: `VoiceManager(ffmpeg_source_class=...)` for testability; discord.FFmpegPCMAudio lazy-imported with `# pragma: no cover`
+- discord.VoiceClient mock: use `AsyncMock()` for async methods (`connect`, `disconnect`), `MagicMock()` for sync methods (`play`, `pause`, `resume`, `stop`, `is_playing`, `is_paused`)
+- To simulate FFmpeg "after" callback (track end): capture `vc.play.call_args[1]["after"]` then call it with `None` (success) or an Exception
 
 ---
 
@@ -42,6 +46,18 @@ Started: Fri Feb 27 09:38:44 PST 2026
   - Queue.list() returns a copy (`list(self._tracks)`) so callers can't mutate internal state
   - GuildQueueRegistry is the idiomatic way to obtain per-guild queues; instantiate once in the Music cog or bot
   - No external dependencies needed for Queue – pure Python, no mocking required in tests
+---
+
+## 2026-02-27 - US-004
+- Wrote 29 unit tests for VoiceManager (RED phase: all failed; GREEN phase: all pass)
+- Implemented VoiceManager with join/leave/play/pause/resume/stop/is_playing/is_paused and on_track_end callback
+- Files changed: bot/audio/voice.py, tests/unit/test_voice.py
+- **Learnings for future iterations:**
+  - Use `asyncio.run()` directly in test functions to test async methods; no pytest-asyncio needed
+  - `VoiceManager(ffmpeg_source_class=mock)` injects FFmpeg mock at construction time
+  - `channel.connect = AsyncMock(return_value=vc)` and `vc.disconnect = AsyncMock()` for Discord async methods
+  - The FFmpeg "after" callback is captured from `vc.play.call_args[1]["after"]` and called manually to simulate track end
+  - `VoiceManager.FFMPEG_BEFORE_OPTIONS` and `VoiceManager.FFMPEG_OPTIONS` are class-level constants for reconnect config
 ---
 
 ## 2026-02-27 - US-002

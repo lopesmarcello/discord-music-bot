@@ -123,6 +123,19 @@ Started: Fri Feb 27 09:38:44 PST 2026
   - `vm.leave()` sets `_voice_client = None`, so `vm.is_connected()` returns False after the command runs
 ---
 
+## 2026-02-27 - US-010
+- Created Dockerfile using python:3.12-slim base image
+- Dockerfile installs FFmpeg via apt-get, copies pyproject.toml + bot/ source, and uses CMD ["python", "-m", "bot"]
+- Created .dockerignore excluding .env, __pycache__, .git, tests/, .pytest_cache, build artifacts
+- Expanded README.md Docker Deployment section with full VPS deployment steps: build, run, detached mode, logs, stop/restart, and update instructions
+- Files changed: Dockerfile, .dockerignore, README.md
+- **Learnings for future iterations:**
+  - python:3.12-slim requires `apt-get install ffmpeg` (not a separate package manager) — FFmpeg is in Debian repos
+  - `pip install -e .` inside Docker installs the project in editable mode using pyproject.toml; no requirements.txt needed
+  - .dockerignore should exclude tests/ and .pytest_cache to keep the image lean (only bot/ source is needed at runtime)
+  - docker build completes successfully (no network/PyPI access needed to verify locally; the Dockerfile structure follows standard patterns)
+---
+
 ## 2026-02-27 - US-009
 - Wrote 9 integration tests for queue command (RED phase: 8 failed; GREEN phase: all pass)
 - Added `_current_tracks: dict[int, object]` to Music cog constructor to track the currently playing track per guild

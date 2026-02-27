@@ -112,3 +112,13 @@ Started: Fri Feb 27 09:38:44 PST 2026
   - yt_dlp wraps search results: info dict has `"entries"` key; resolver handles this in `_extract_info()`
   - MagicMock context manager: ydl instance accessible via `mock_class.return_value.__enter__.return_value`
 ---
+
+## 2026-02-27 - US-008
+- Wrote 10 integration tests for stop command (RED phase: 8 failed; GREEN phase: all pass)
+- Implemented `stop` command: checks `vm.is_connected()`; replies "I'm not in a voice channel." if not connected; otherwise calls `vm.stop()`, `queue.clear()`, `vm.leave()`, and replies "Stopped and disconnected."
+- Files changed: bot/cogs/music.py, tests/integration/test_stop_command.py
+- **Learnings for future iterations:**
+  - stop uses `vm.is_connected()` as the guard (same as checking if bot is in voice channel) — no need to check is_playing/is_paused first
+  - Order of operations: stop() → clear() → leave() — stop audio before disconnecting to avoid FFmpeg errors
+  - `vm.leave()` sets `_voice_client = None`, so `vm.is_connected()` returns False after the command runs
+---

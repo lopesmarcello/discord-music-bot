@@ -116,7 +116,7 @@
     {
       "id": "US-008",
       "title": "stop command (RED/GREEN)",
-      "passes": false,
+      "passes": true,
       "description": "As a server member, I want to stop playback and clear the queue so I can end the music session.",
       "acceptanceCriteria": [
         "RED: Write failing tests before implementation",

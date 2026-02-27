@@ -1,10 +1,10 @@
 # Discord Music Bot
 
-A self-hosted Discord music bot written in Python that streams audio from YouTube, Spotify, and SoundCloud into voice channels. Supports both slash commands (`/play`) and prefix commands (`!play`).
+A self-hosted Discord music bot written in Python that streams audio from YouTube and SoundCloud into voice channels. Supports both slash commands (`/play`) and prefix commands (`!play`).
 
 ## Features
 
-- Stream audio from YouTube URLs, YouTube search queries, Spotify track URLs, and SoundCloud URLs
+- Stream audio from YouTube URLs, YouTube search queries, and SoundCloud URLs
 - Playback controls: play, pause, resume, stop, skip
 - Per-guild song queue with add/view/clear operations
 - Both slash commands (`/play`) and prefix commands (`!play`)
@@ -42,15 +42,12 @@ Edit `.env` with your values:
 
 ```
 DISCORD_TOKEN=your_discord_bot_token
-SPOTIFY_CLIENT_ID=your_spotify_client_id
-SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 COMMAND_PREFIX=!
 ```
 
 #### Getting credentials
 
 - **Discord token**: Create a bot at [Discord Developer Portal](https://discord.com/developers/applications), enable "Message Content Intent" under Bot settings
-- **Spotify credentials**: Create an app at [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) using Client Credentials flow
 
 ### 4. Run the bot
 
@@ -137,8 +134,9 @@ docker run -d --name music-bot --restart unless-stopped --env-file .env discord-
 ## Supported Sources
 
 - **YouTube**: Direct URLs or search queries
-- **Spotify**: Track URLs (metadata fetched, streamed via YouTube)
 - **SoundCloud**: Direct track URLs
+
+> **Note:** Spotify URLs are not supported. To play a Spotify track, search by song name instead, e.g. `/play artist - song title`.
 
 ## Project Structure
 

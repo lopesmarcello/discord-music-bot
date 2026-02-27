@@ -39,3 +39,12 @@ Started: Fri Feb 27 11:08:31 PST 2026
   - When removing a feature, replace feature-specific tests with tests that verify the feature is now rejected
   - `UnsupportedSourceError` must be imported in music.py to use in try/except
 ---
+
+## 2026-02-27 - US-005
+- Removed all Spotify references from README.md: updated description, features list, setup section (removed SPOTIFY env vars from .env example and Getting Credentials guide), and Supported Sources section
+- Added a note in Supported Sources explaining Spotify URLs are unsupported and directing users to search by song name
+- .env.example was already cleaned up in US-001
+- Files changed: README.md, scripts/prd.json, scripts/progress.txt
+- **Learnings for future iterations:**
+  - When removing a feature, check: description, features list, setup/config docs, supported sources, and any credential setup guides
+---

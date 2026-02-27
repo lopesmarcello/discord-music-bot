@@ -58,7 +58,7 @@
     {
       "id": "US-005",
       "title": "Remove Spotify from documentation and config",
-      "passes": false,
+      "passes": true,
       "description": "As a developer, I want all project documentation and config templates to reflect that Spotify is no longer supported so that new users aren't confused by references to removed features.",
       "acceptanceCriteria": [
         "README.md no longer mentions Spotify, SPOTIFY_CLIENT_ID, or SPOTIFY_CLIENT_SECRET",

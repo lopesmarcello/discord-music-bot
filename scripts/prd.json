@@ -34,7 +34,7 @@
     {
       "id": "US-003",
       "title": "Queue data structure (RED/GREEN)",
-      "passes": false,
+      "passes": true,
       "description": "As a developer, I need an in-memory queue per guild so songs can be added, peeked at, skipped, and cleared without touching Discord or audio systems.",
       "acceptanceCriteria": [
         "RED: Write failing tests for Queue class before implementation",

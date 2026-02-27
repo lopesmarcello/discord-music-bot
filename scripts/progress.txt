@@ -14,6 +14,7 @@ Started: Fri Feb 27 09:38:44 PST 2026
 - yt_dlp / spotipy are not installed; mock them via `unittest.mock.patch.dict("sys.modules", {...})` or inject mocks at constructor time
 - yt_dlp search queries wrap results in `{"entries": [...]}` – resolver unwraps `entries[0]` automatically
 - `MagicMock` supports context manager protocol natively; access the `with` block value via `mock_class.return_value.__enter__.return_value`
+- GuildQueueRegistry (in bot/audio/queue.py) manages per-guild Queue instances; use `registry.get_queue(guild_id)` in command handlers
 
 ---
 
@@ -30,6 +31,17 @@ Started: Fri Feb 27 09:38:44 PST 2026
   - Run pytest as: `PYTHONPATH=/tmp/pypackages python3 -m pytest`
   - asyncio_mode config option requires pytest-asyncio installed; removed from pyproject.toml until US-004/005
   - The `pyproject.toml` has `asyncio_mode` removed for now - add it back in US-004 when pytest-asyncio is bootstrapped
+---
+
+## 2026-02-27 - US-003
+- Wrote 25 unit tests for Queue and GuildQueueRegistry (RED phase: failed at import; GREEN phase: all pass)
+- Implemented Queue with add/next/peek/clear/list; all empty-queue edge cases handled
+- Implemented GuildQueueRegistry with get_queue(guild_id) and delete_queue(guild_id)
+- Files changed: bot/audio/queue.py, tests/unit/test_queue.py
+- **Learnings for future iterations:**
+  - Queue.list() returns a copy (`list(self._tracks)`) so callers can't mutate internal state
+  - GuildQueueRegistry is the idiomatic way to obtain per-guild queues; instantiate once in the Music cog or bot
+  - No external dependencies needed for Queue – pure Python, no mocking required in tests
 ---
 
 ## 2026-02-27 - US-002

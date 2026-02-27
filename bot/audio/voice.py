@@ -71,6 +71,10 @@ class VoiceManager:
             return False
         return self._voice_client.is_paused()
 
+    def is_connected(self) -> bool:
+        """Return True if connected to a voice channel."""
+        return self._voice_client is not None
+
     def set_on_track_end(self, callback: Callable) -> None:
         """Register a callback to be called when a track ends."""
         self._on_track_end = callback

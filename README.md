@@ -76,6 +76,11 @@ pytest tests/integration/
 
 ## Docker Deployment
 
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) installed on your VPS or local machine
+- A configured `.env` file (copy from `.env.example` and fill in credentials)
+
 ### Build the image
 
 ```bash
@@ -88,7 +93,35 @@ docker build -t discord-music-bot .
 docker run --env-file .env discord-music-bot
 ```
 
-**Note:** Make sure your `.env` file is configured with valid credentials before running.
+### Run in the background (detached)
+
+```bash
+docker run -d --name music-bot --restart unless-stopped --env-file .env discord-music-bot
+```
+
+### View logs
+
+```bash
+docker logs -f music-bot
+```
+
+### Stop / restart the bot
+
+```bash
+docker stop music-bot
+docker start music-bot
+```
+
+### Update to a new version
+
+```bash
+docker stop music-bot
+docker rm music-bot
+docker build -t discord-music-bot .
+docker run -d --name music-bot --restart unless-stopped --env-file .env discord-music-bot
+```
+
+**Note:** Make sure your `.env` file is configured with valid credentials before running. Never commit `.env` to version control.
 
 ## Commands
 

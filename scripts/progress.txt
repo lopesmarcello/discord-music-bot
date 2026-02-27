@@ -1,151 +1,24 @@
 # Ralph Progress Log
-Started: Fri Feb 27 09:38:44 PST 2026
+Started: Fri Feb 27 11:08:31 PST 2026
 ---
 
 ## Codebase Patterns
-- pytest must be run with `PYTHONPATH=/tmp/pypackages` since packages cannot be installed system-wide (no pip, no PyPI access in this environment)
-- Packages were bootstrapped from GitHub: pytest wheel from GitHub releases, pluggy/packaging/pygments cloned from GitHub and extracted to /tmp/pypackages
-- pluggy requires a dist-info directory to report its version; created manually at /tmp/pypackages/pluggy-1.6.0.dist-info/
-- The environment uses Python 3.11.2 on Debian with EXTERNALLY-MANAGED flag; use --target or custom PYTHONPATH for package management
-- GitHub is accessible (allowed by firewall); PyPI is NOT accessible
-- All bot modules are in bot/ with stubs raising NotImplementedError until their story is implemented
-- Tests are in tests/unit/ (pure unit tests) and tests/integration/ (mocked Discord tests)
-- AudioResolver uses dependency injection: `AudioResolver(ytdl_class=..., spotipy_client=...)` for testability; production deps lazy-imported with `# pragma: no cover`
-- yt_dlp / spotipy are not installed; mock them via `unittest.mock.patch.dict("sys.modules", {...})` or inject mocks at constructor time
-- yt_dlp search queries wrap results in `{"entries": [...]}` – resolver unwraps `entries[0]` automatically
-- `MagicMock` supports context manager protocol natively; access the `with` block value via `mock_class.return_value.__enter__.return_value`
-- GuildQueueRegistry (in bot/audio/queue.py) manages per-guild Queue instances; use `registry.get_queue(guild_id)` in command handlers
-- pytest-asyncio is NOT installed; test async methods using `asyncio.run(coroutine)` directly in test functions (no decorators needed)
-- VoiceManager uses dependency injection: `VoiceManager(ffmpeg_source_class=...)` for testability; discord.FFmpegPCMAudio lazy-imported with `# pragma: no cover`
-- discord.VoiceClient mock: use `AsyncMock()` for async methods (`connect`, `disconnect`), `MagicMock()` for sync methods (`play`, `pause`, `resume`, `stop`, `is_playing`, `is_paused`)
-- To simulate FFmpeg "after" callback (track end): capture `vc.play.call_args[1]["after"]` then call it with `None` (success) or an Exception
-- discord / discord.ext.commands are NOT installed; mock them in tests/integration/conftest.py using sys.modules before any bot cog imports
-- Music cog uses dependency injection: `Music(bot, resolver=..., queue_registry=..., ffmpeg_source_class=...)` for testability
-- Integration tests use `asyncio.run(cog.command(ctx, ...))` directly; ctx.send and ctx.defer are AsyncMock; ctx.author.voice is None for "not in voice" tests
-- VoiceManager.is_connected() returns True when _voice_client is not None; used by Music cog to avoid re-joining
-- on_track_end callback body uses asyncio.run_coroutine_threadsafe; marked `# pragma: no cover` since it requires a running event loop
+- pytest must be run with `PYTHONPATH=/tmp/pypackages python3.11 -m pytest` (packages bootstrapped from GitHub in prior PRD run; PyPI not accessible)
+- pypackages at /tmp/pypackages contains: pytest, pluggy, packaging, iniconfig, pygments (no pytest-asyncio)
+- AudioResolver uses dependency injection (`ytdl_class`, `spotipy_client` constructor params) — no sys.modules hacking needed in tests
+- All resolver tests mock spotipy client via constructor injection, not via sys.modules; lazy-import test uses `patch.dict("sys.modules", {...})`
+- `UnsupportedSourceError` is raised for any unrecognised https/http URL that doesn't match YouTube, SoundCloud (or previously Spotify)
 
 ---
 
 ## 2026-02-27 - US-001
-- Created full project scaffold: pyproject.toml, .env.example, .gitignore, README.md
-- Created directory structure: bot/, bot/cogs/, bot/audio/, tests/unit/, tests/integration/
-- Created stub modules: bot/audio/resolver.py (AudioResolver, AudioTrack, UnsupportedSourceError), bot/audio/queue.py (Queue), bot/audio/voice.py (VoiceManager), bot/cogs/music.py (Music cog with all commands as stubs), bot/bot.py, bot/__main__.py
-- Created placeholder test files for all future stories
-- Created tests/test_scaffold.py with 5 passing smoke tests
-- Created scripts/prd.json with all 10 user stories (US-001 marked passes: true)
-- Files changed: pyproject.toml, .env.example, .gitignore, README.md, bot/*, tests/*
+- Removed `spotipy` from `dependencies` in `pyproject.toml`
+- Removed `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` entries from `.env.example`
+- Created new `scripts/prd.json` for the Remove Spotify Integration PRD (5 stories)
+- All 136 existing tests continue to pass (Spotify tests use mock injection so don't require spotipy installed)
+- Files changed: pyproject.toml, .env.example, scripts/prd.json, scripts/progress.txt
 - **Learnings for future iterations:**
-  - No pip available system-wide; packages must be bootstrapped from GitHub and put in /tmp/pypackages
-  - Run pytest as: `PYTHONPATH=/tmp/pypackages python3 -m pytest`
-  - asyncio_mode config option requires pytest-asyncio installed; removed from pyproject.toml until US-004/005
-  - The `pyproject.toml` has `asyncio_mode` removed for now - add it back in US-004 when pytest-asyncio is bootstrapped
----
-
-## 2026-02-27 - US-003
-- Wrote 25 unit tests for Queue and GuildQueueRegistry (RED phase: failed at import; GREEN phase: all pass)
-- Implemented Queue with add/next/peek/clear/list; all empty-queue edge cases handled
-- Implemented GuildQueueRegistry with get_queue(guild_id) and delete_queue(guild_id)
-- Files changed: bot/audio/queue.py, tests/unit/test_queue.py
-- **Learnings for future iterations:**
-  - Queue.list() returns a copy (`list(self._tracks)`) so callers can't mutate internal state
-  - GuildQueueRegistry is the idiomatic way to obtain per-guild queues; instantiate once in the Music cog or bot
-  - No external dependencies needed for Queue – pure Python, no mocking required in tests
----
-
-## 2026-02-27 - US-004
-- Wrote 29 unit tests for VoiceManager (RED phase: all failed; GREEN phase: all pass)
-- Implemented VoiceManager with join/leave/play/pause/resume/stop/is_playing/is_paused and on_track_end callback
-- Files changed: bot/audio/voice.py, tests/unit/test_voice.py
-- **Learnings for future iterations:**
-  - Use `asyncio.run()` directly in test functions to test async methods; no pytest-asyncio needed
-  - `VoiceManager(ffmpeg_source_class=mock)` injects FFmpeg mock at construction time
-  - `channel.connect = AsyncMock(return_value=vc)` and `vc.disconnect = AsyncMock()` for Discord async methods
-  - The FFmpeg "after" callback is captured from `vc.play.call_args[1]["after"]` and called manually to simulate track end
-  - `VoiceManager.FFMPEG_BEFORE_OPTIONS` and `VoiceManager.FFMPEG_OPTIONS` are class-level constants for reconnect config
----
-
-## 2026-02-27 - US-005
-- Wrote 16 integration tests for play command (RED phase: TypeError on import; GREEN phase: all pass)
-- Added `VoiceManager.is_connected()` method to bot/audio/voice.py
-- Rewrote Music cog constructor to accept injected deps: `resolver`, `queue_registry`, `ffmpeg_source_class`, `voice_managers`
-- Implemented `play` command with: voice channel check, auto-join, resolver call, queue add, immediate play vs queue logic
-- Added `_get_voice_manager()`, `_make_on_track_end()`, `_play_next()` helpers to Music cog
-- Created `tests/integration/conftest.py` to mock discord/discord.ext.commands before cog imports
-- Files changed: bot/audio/voice.py, bot/cogs/music.py, tests/integration/test_play_command.py, tests/integration/conftest.py
-- **Learnings for future iterations:**
-  - Integration tests for Discord cogs need conftest.py that patches sys.modules for discord BEFORE import
-  - conftest.py must provide real Python classes for `commands.Cog` (base class) and stub `hybrid_command` as a pass-through decorator
-  - Music cog _voice_managers dict is keyed by guild_id (int); use `_get_voice_manager(guild_id)` to get/create per-guild VoiceManager
-  - `_play_next()` pops the front track from the queue and calls vm.play(); called when queue has tracks and bot is idle
-  - The on_track_end callback for auto-advance uses run_coroutine_threadsafe; skip testing this path with pragma no cover
----
-
-## 2026-02-27 - US-006
-- Wrote 12 integration tests for pause/resume commands (RED phase: 10 failed; GREEN phase: all pass)
-- Implemented `pause` command: checks `vm.is_playing()`; replies "Nothing is currently playing." or calls `vm.pause()` and replies "Paused."
-- Implemented `resume` command: checks `vm.is_paused()`; replies "Playback is not paused." or calls `vm.resume()` and replies "Resumed."
-- Files changed: bot/cogs/music.py, tests/integration/test_controls.py
-- **Learnings for future iterations:**
-  - pause/resume tests use `_make_cog_with_vm(vc)` helper that pre-injects a VoiceManager with a live `_voice_client` so is_playing/is_paused return correct values
-  - When bot has no VoiceManager for a guild yet, `_get_voice_manager()` creates a disconnected one; `is_playing()` and `is_paused()` both return False safely
----
-
-## 2026-02-27 - US-007
-- Wrote 10 integration tests for skip command (RED phase: 8 failed; GREEN phase: all pass)
-- Implemented `skip` command: checks `vm.is_playing()` or `vm.is_paused()`; replies "Nothing to skip." or calls `vm.stop()`, peeks queue, calls `_play_next()`, replies "Skipped. Now playing: {title}" or "Skipped. Queue is empty."
-- Files changed: bot/cogs/music.py, tests/integration/test_skip_command.py
-- **Learnings for future iterations:**
-  - Use `queue.peek()` before `_play_next()` to get the next track title for the reply message without consuming the track twice
-  - Skip checks both `is_playing()` AND `is_paused()` — paused audio should also be skippable
-  - The currently playing track has already been popped from the queue; the queue holds upcoming tracks
----
-
-## 2026-02-27 - US-002
-- Wrote 20 unit tests for AudioResolver (RED phase: all failed; GREEN phase: all pass)
-- Implemented AudioResolver with dependency injection (`ytdl_class`, `spotipy_client` constructor params)
-- Files changed: bot/audio/resolver.py, tests/unit/test_resolver.py
-- Patterns covered: YouTube URL, Spotify URL (Spotipy metadata + YouTube fallback), SoundCloud URL, plain search, unsupported URL
-- **Learnings for future iterations:**
-  - Use `AudioResolver(ytdl_class=mock, spotipy_client=mock)` in all resolver tests – no sys.modules hacking needed for functional tests
-  - Test lazy-import paths by pre-populating `sys.modules` with mocks and calling `_get_ytdl_class()` / `_get_spotipy_client()` directly
-  - yt_dlp wraps search results: info dict has `"entries"` key; resolver handles this in `_extract_info()`
-  - MagicMock context manager: ydl instance accessible via `mock_class.return_value.__enter__.return_value`
----
-
-## 2026-02-27 - US-008
-- Wrote 10 integration tests for stop command (RED phase: 8 failed; GREEN phase: all pass)
-- Implemented `stop` command: checks `vm.is_connected()`; replies "I'm not in a voice channel." if not connected; otherwise calls `vm.stop()`, `queue.clear()`, `vm.leave()`, and replies "Stopped and disconnected."
-- Files changed: bot/cogs/music.py, tests/integration/test_stop_command.py
-- **Learnings for future iterations:**
-  - stop uses `vm.is_connected()` as the guard (same as checking if bot is in voice channel) — no need to check is_playing/is_paused first
-  - Order of operations: stop() → clear() → leave() — stop audio before disconnecting to avoid FFmpeg errors
-  - `vm.leave()` sets `_voice_client = None`, so `vm.is_connected()` returns False after the command runs
----
-
-## 2026-02-27 - US-010
-- Created Dockerfile using python:3.12-slim base image
-- Dockerfile installs FFmpeg via apt-get, copies pyproject.toml + bot/ source, and uses CMD ["python", "-m", "bot"]
-- Created .dockerignore excluding .env, __pycache__, .git, tests/, .pytest_cache, build artifacts
-- Expanded README.md Docker Deployment section with full VPS deployment steps: build, run, detached mode, logs, stop/restart, and update instructions
-- Files changed: Dockerfile, .dockerignore, README.md
-- **Learnings for future iterations:**
-  - python:3.12-slim requires `apt-get install ffmpeg` (not a separate package manager) — FFmpeg is in Debian repos
-  - `pip install -e .` inside Docker installs the project in editable mode using pyproject.toml; no requirements.txt needed
-  - .dockerignore should exclude tests/ and .pytest_cache to keep the image lean (only bot/ source is needed at runtime)
-  - docker build completes successfully (no network/PyPI access needed to verify locally; the Dockerfile structure follows standard patterns)
----
-
-## 2026-02-27 - US-009
-- Wrote 9 integration tests for queue command (RED phase: 8 failed; GREEN phase: all pass)
-- Added `_current_tracks: dict[int, object]` to Music cog constructor to track the currently playing track per guild
-- Updated `_play_next()` to store the popped track in `_current_tracks[guild_id]`
-- Updated `stop` command to clear `_current_tracks[guild_id] = None` after stopping
-- Implemented `queue` command: empty check → plain text reply; otherwise builds discord.Embed with `description` containing "Now Playing" + numbered queue entries (max 10) + "...and N more" if needed
-- Files changed: bot/cogs/music.py, tests/integration/test_queue_command.py
-- **Learnings for future iterations:**
-  - `discord.Embed` is a MagicMock in tests; setting `embed.description = "..."` in implementation means tests can assert `embed.description == "..."` directly
-  - Retrieve the embed in tests from `ctx.send.call_args[1]["embed"]` — avoids shared-mock contamination
-  - Putting all queue content in a single `embed.description` string (vs. multiple `add_field` calls) is simpler to test and avoids mock call-count accumulation issues
-  - _current_tracks must be initialised in `__init__` and updated in `_play_next` and `stop`; skip doesn't need updating because it calls `_play_next` which updates the current track
+  - The Spotify tests (TestResolveSpotify, TestGetSpotipyClientLazyImport) still pass even without spotipy installed because they use mock injection and `patch.dict("sys.modules", ...)`
+  - US-002, US-003, US-004 must be implemented together in one commit: removing Spotify code (US-002) will break TestResolveSpotify (US-004 must follow immediately)
+  - US-005 (README/docs cleanup) can be done independently
 ---

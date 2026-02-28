@@ -15,7 +15,7 @@
     {
       "id": "US-003",
       "title": "Implement queue and playback API endpoints",
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-004",

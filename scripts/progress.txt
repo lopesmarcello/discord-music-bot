@@ -1,4 +1,7 @@
 ## Codebase Patterns
+- API endpoint handlers access the bot via `request.app.get("bot")`; bot is stored in app via `app["bot"] = bot` in `create_app(bot=bot)`
+- FakeApplication in tests/conftest.py supports dict-style access (`app["key"]`, `app.get("key")`) for storing bot reference
+- New HTTP exception stubs (FakeHTTPBadRequest, FakeHTTPServiceUnavailable) follow same pattern: subclass FakeHTTPException with `reason` kwarg
 - Python test environment: `/tmp/bot-venv/bin/python` with `PYTHONPATH=/tmp/pypackages:/workspace`
 - Run tests: `PYTHONPATH=/tmp/pypackages:/workspace /tmp/bot-venv/bin/python -m pytest /workspace/tests/ -v`
 - No network access in the container — use lazy imports and sys.modules stubs for packages not in bot-venv
@@ -44,4 +47,19 @@ Started: Sat Feb 28 10:43:17 PST 2026
   - Avoid `except aiohttp.web.HTTPException: raise` when using MagicMock stubs — use flag variables or restructure to avoid catching your own raises
   - `@asynccontextmanager` + `yield` is more reliable for mocking `async with session.post(...) as resp:` than setting `__aenter__`/`__aexit__` on MagicMock
   - All shared stubs (aiohttp, jwt) belong in `tests/conftest.py`; test files import from there
+---
+
+## 2026-02-28 - US-003
+- Implemented queue and playback API endpoints in `bot/api/player.py`
+- Routes: GET /api/queue, POST /api/queue/skip, POST /api/queue/clear, GET /api/playback, POST /api/playback/pause, POST /api/playback/resume, POST /api/playback/stop
+- Updated `bot/api/server.py` to accept `bot` param (stored as `app["bot"]`) and register player routes via `setup_player_routes(app)`
+- Updated `bot/__main__.py` to pass `bot=bot` to `create_app()`
+- Updated `tests/conftest.py`: added dict-style access to `FakeApplication` (`__setitem__`, `__getitem__`, `get`); added `FakeHTTPBadRequest` and `FakeHTTPServiceUnavailable` exception stubs; registered them in `mock_web`
+- Added `tests/test_player_api.py` with 30 tests; all 205 tests pass
+- Files changed: `bot/api/player.py` (new), `bot/api/server.py`, `bot/__main__.py`, `tests/conftest.py`, `tests/test_player_api.py` (new)
+- **Learnings for future iterations:**
+  - Bot is injected into the aiohttp app via `app["bot"] = bot`; handlers read it with `request.app.get("bot")` (returns None if not set)
+  - For "Music cog not available" guard, handlers raise `HTTPServiceUnavailable`; for bad input (missing guild_id, wrong state), raise `HTTPBadRequest`
+  - Skip delegates to `music._play_next(guild_id)` after `vm.stop()` — same logic as the Discord `/skip` command
+  - Stop calls `vm.stop()`, `queue.clear()`, sets `music._current_tracks[guild_id] = None`, then `await vm.leave()`
 ---

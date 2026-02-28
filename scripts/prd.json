@@ -25,7 +25,7 @@
     {
       "id": "US-005",
       "title": "Add dashboard service to Docker Compose",
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-006",

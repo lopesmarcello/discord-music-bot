@@ -1,4 +1,5 @@
 ## Codebase Patterns
+- Dashboard nginx reverse-proxies `/api/` and `/auth/` to `bot:8080`; all other routes serve `index.html` (SPA fallback)
 - YouTube search: `AudioResolver.search(query, max_results=5)` uses `ytsearch{n}:` prefix; returns list of dicts with title, url, duration, thumbnail
 - Injectable resolver in search handler via `_resolver_factory=None` kwarg (same pattern as `_http_session_factory` in auth.py)
 - Search handler falls back to Music cog's `._resolver` if bot/cog available, else creates fresh `AudioResolver()`
@@ -78,4 +79,19 @@ Started: Sat Feb 28 10:43:17 PST 2026
   - For "Music cog not available" guard, handlers raise `HTTPServiceUnavailable`; for bad input (missing guild_id, wrong state), raise `HTTPBadRequest`
   - Skip delegates to `music._play_next(guild_id)` after `vm.stop()` — same logic as the Discord `/skip` command
   - Stop calls `vm.stop()`, `queue.clear()`, sets `music._current_tracks[guild_id] = None`, then `await vm.leave()`
+---
+
+## 2026-02-28 - US-005
+- Added `dashboard/` service to Docker Compose for full-stack deployment
+- Created `dashboard/Dockerfile` — nginx:alpine serving static files from `/usr/share/nginx/html`
+- Created `dashboard/nginx.conf` — listens on port 80; reverse-proxies `/api/` and `/auth/` to `bot:8080`; SPA fallback (`try_files`) for all other routes
+- Created `dashboard/index.html` — minimal placeholder (`<div id="root">`) until React app is scaffolded in US-006
+- Updated `docker-compose.yml`: `bot` service uses `expose: 8080` (internal); `dashboard` service builds from `./dashboard`, maps `3000:80`, `depends_on: bot`
+- Updated `.env.example` with: `API_PORT`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI`, `JWT_SECRET`
+- All 227 existing tests still pass
+- Files changed: `dashboard/Dockerfile` (new), `dashboard/nginx.conf` (new), `dashboard/index.html` (new), `docker-compose.yml`, `.env.example`
+- **Learnings for future iterations:**
+  - Docker Compose default network allows services to reach each other by service name (e.g., `http://bot:8080`)
+  - `expose:` in Compose makes the port available to sibling services only (not host); `ports:` maps to host
+  - US-006 should replace `dashboard/index.html` with the Vite React build output and update `dashboard/Dockerfile` to a multi-stage build
 ---

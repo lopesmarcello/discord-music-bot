@@ -110,6 +110,52 @@ async def handle_queue_clear(request: "aiohttp.web.Request") -> "aiohttp.web.Res
     )
 
 
+async def handle_queue_add(
+    request: "aiohttp.web.Request",
+    *,
+    _resolver_factory=None,
+) -> "aiohttp.web.Response":
+    """POST /api/queue/add?guild_id={id} — add a track by URL to the queue."""
+    import aiohttp.web  # noqa: PLC0415
+
+    guild_id = _require_guild_id(request)
+    music = _get_music_cog(request)
+
+    if music is None:
+        raise aiohttp.web.HTTPServiceUnavailable(reason="Music cog not available")
+
+    body = await request.json()
+    url = (body.get("url") or "").strip() if isinstance(body, dict) else ""
+    if not url:
+        raise aiohttp.web.HTTPBadRequest(reason="url field is required")
+
+    if _resolver_factory is not None:
+        resolver = _resolver_factory()
+    else:
+        resolver = music._resolver
+
+    try:
+        from bot.audio.resolver import UnsupportedSourceError  # noqa: PLC0415
+        track = resolver.resolve(url)
+    except UnsupportedSourceError as exc:
+        raise aiohttp.web.HTTPBadRequest(reason=str(exc))
+
+    queue = music._queue_registry.get_queue(guild_id)
+    queue.add(track)
+
+    vm = music._get_voice_manager(guild_id)
+    if not vm.is_playing() and not vm.is_paused():
+        await music._play_next(guild_id)
+
+    return aiohttp.web.Response(
+        text=json.dumps({
+            "added": True,
+            "track": _track_dict(track),
+        }),
+        content_type="application/json",
+    )
+
+
 async def handle_playback_get(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
     """GET /api/playback?guild_id={id} — return current playback state."""
     import aiohttp.web  # noqa: PLC0415
@@ -210,6 +256,7 @@ def setup_player_routes(app: "aiohttp.web.Application") -> None:
     import aiohttp.web  # noqa: PLC0415
 
     app.router.add_get("/api/queue", handle_queue_get)
+    app.router.add_post("/api/queue/add", handle_queue_add)
     app.router.add_post("/api/queue/skip", handle_queue_skip)
     app.router.add_post("/api/queue/clear", handle_queue_clear)
     app.router.add_get("/api/playback", handle_playback_get)

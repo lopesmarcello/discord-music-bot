@@ -117,6 +117,7 @@ class TestSetupPlayerRoutes:
         setup_player_routes(app)
         routes = {(method, path) for method, path, _ in app.router.routes}
         assert ("GET", "/api/queue") in routes
+        assert ("POST", "/api/queue/add") in routes
         assert ("POST", "/api/queue/skip") in routes
         assert ("POST", "/api/queue/clear") in routes
         assert ("GET", "/api/playback") in routes
@@ -309,6 +310,176 @@ class TestHandleQueueClear:
             asyncio.run(handle_queue_clear(request))
             assert False, "expected HTTPServiceUnavailable"
         except FakeHTTPServiceUnavailable:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# POST /api/queue/add
+# ---------------------------------------------------------------------------
+
+
+def _make_request_with_json(guild_id=None, body=None, app_data=None):
+    """Return a fake request with JSON body support."""
+    request = MagicMock()
+    if guild_id is not None:
+        request.rel_url.query = {"guild_id": str(guild_id)}
+    else:
+        request.rel_url.query = {}
+    request.json = AsyncMock(return_value=body if body is not None else {})
+    app = FakeApplication()
+    if app_data:
+        for k, v in app_data.items():
+            app[k] = v
+    request.app = app
+    return request
+
+
+class TestHandleQueueAdd:
+    def test_adds_track_and_starts_playback_when_idle(self):
+        from bot.api.player import handle_queue_add
+
+        track = _make_track("New Song", url="https://youtube.com/watch?v=abc")
+        resolver = MagicMock()
+        resolver.resolve.return_value = track
+
+        vm = _make_vm(is_playing=False, is_paused=False)
+        cog, _, q = _make_music_cog(vm=vm)
+        q.add = MagicMock()
+
+        bot = _make_bot(cog)
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "https://youtube.com/watch?v=abc"},
+            app_data={"bot": bot},
+        )
+        resp = asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+        data = json.loads(resp.text)
+        assert data["added"] is True
+        assert data["track"]["title"] == "New Song"
+        q.add.assert_called_once_with(track)
+        cog._play_next.assert_awaited_once_with(123)
+
+    def test_adds_track_without_starting_playback_when_already_playing(self):
+        from bot.api.player import handle_queue_add
+
+        track = _make_track("Queued Song")
+        resolver = MagicMock()
+        resolver.resolve.return_value = track
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        q.add = MagicMock()
+
+        bot = _make_bot(cog)
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "https://youtube.com/watch?v=xyz"},
+            app_data={"bot": bot},
+        )
+        resp = asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+        data = json.loads(resp.text)
+        assert data["added"] is True
+        q.add.assert_called_once_with(track)
+        cog._play_next.assert_not_awaited()
+
+    def test_adds_track_without_starting_playback_when_paused(self):
+        from bot.api.player import handle_queue_add
+
+        track = _make_track("Paused Song")
+        resolver = MagicMock()
+        resolver.resolve.return_value = track
+
+        vm = _make_vm(is_playing=False, is_paused=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        q.add = MagicMock()
+
+        bot = _make_bot(cog)
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "https://youtube.com/watch?v=paused"},
+            app_data={"bot": bot},
+        )
+        resp = asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+        data = json.loads(resp.text)
+        assert data["added"] is True
+        cog._play_next.assert_not_awaited()
+
+    def test_missing_url_raises_bad_request(self):
+        from bot.api.player import handle_queue_add
+
+        cog, vm, q = _make_music_cog()
+        bot = _make_bot(cog)
+        request = _make_request_with_json(
+            guild_id=123,
+            body={},
+            app_data={"bot": bot},
+        )
+        try:
+            asyncio.run(handle_queue_add(request))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
+            pass
+
+    def test_empty_url_raises_bad_request(self):
+        from bot.api.player import handle_queue_add
+
+        cog, vm, q = _make_music_cog()
+        bot = _make_bot(cog)
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "   "},
+            app_data={"bot": bot},
+        )
+        try:
+            asyncio.run(handle_queue_add(request))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
+            pass
+
+    def test_unsupported_url_raises_bad_request(self):
+        from bot.api.player import handle_queue_add
+        from bot.audio.resolver import UnsupportedSourceError
+
+        resolver = MagicMock()
+        resolver.resolve.side_effect = UnsupportedSourceError("Unsupported URL")
+
+        cog, vm, q = _make_music_cog()
+        bot = _make_bot(cog)
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "https://unsupported.example.com/song"},
+            app_data={"bot": bot},
+        )
+        try:
+            asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
+            pass
+
+    def test_no_bot_raises_service_unavailable(self):
+        from bot.api.player import handle_queue_add
+
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "https://youtube.com/watch?v=abc"},
+        )
+        try:
+            asyncio.run(handle_queue_add(request))
+            assert False, "expected HTTPServiceUnavailable"
+        except FakeHTTPServiceUnavailable:
+            pass
+
+    def test_missing_guild_id_raises_bad_request(self):
+        from bot.api.player import handle_queue_add
+
+        request = _make_request_with_json(
+            guild_id=None,
+            body={"url": "https://youtube.com/watch?v=abc"},
+        )
+        try:
+            asyncio.run(handle_queue_add(request))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
             pass
 
 

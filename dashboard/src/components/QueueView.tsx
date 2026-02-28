@@ -4,6 +4,7 @@ import { clearQueue, fetchQueue, skipTrack } from '../api';
 
 interface QueueViewProps {
   guildId: string;
+  refreshTrigger?: number;
 }
 
 function formatDuration(seconds: number | null): string {
@@ -13,7 +14,7 @@ function formatDuration(seconds: number | null): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export default function QueueView({ guildId }: QueueViewProps) {
+export default function QueueView({ guildId, refreshTrigger }: QueueViewProps) {
   const [queue, setQueue] = useState<QueueData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -32,6 +33,10 @@ export default function QueueView({ guildId }: QueueViewProps) {
     const id = setInterval(loadQueue, 5000);
     return () => clearInterval(id);
   }, [loadQueue]);
+
+  useEffect(() => {
+    if (refreshTrigger) loadQueue();
+  }, [refreshTrigger, loadQueue]);
 
   async function handleSkip() {
     setBusy(true);

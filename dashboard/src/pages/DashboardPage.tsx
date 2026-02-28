@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import type { User } from '../api';
 import { logout } from '../api';
 import QueueView from '../components/QueueView';
+import SearchBar from '../components/SearchBar';
 
 interface DashboardPageProps {
   user: User;
@@ -9,6 +11,8 @@ interface DashboardPageProps {
 }
 
 export default function DashboardPage({ user, guildId, onLogout }: DashboardPageProps) {
+  const [queueRefreshKey, setQueueRefreshKey] = useState(0);
+
   async function handleLogout() {
     await logout();
     onLogout();
@@ -33,7 +37,13 @@ export default function DashboardPage({ user, guildId, onLogout }: DashboardPage
 
       <main style={styles.main}>
         {guildId ? (
-          <QueueView guildId={guildId} />
+          <>
+            <SearchBar
+              guildId={guildId}
+              onAdded={() => setQueueRefreshKey(k => k + 1)}
+            />
+            <QueueView guildId={guildId} refreshTrigger={queueRefreshKey} />
+          </>
         ) : (
           <div style={styles.noGuild}>
             <p>No guild selected. Please log in again with a guild link.</p>

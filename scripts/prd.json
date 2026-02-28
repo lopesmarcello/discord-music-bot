@@ -20,7 +20,7 @@
     {
       "id": "US-004",
       "title": "Implement YouTube search API endpoint",
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-005",

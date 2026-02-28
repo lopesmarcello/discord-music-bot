@@ -1,4 +1,7 @@
 ## Codebase Patterns
+- YouTube search: `AudioResolver.search(query, max_results=5)` uses `ytsearch{n}:` prefix; returns list of dicts with title, url, duration, thumbnail
+- Injectable resolver in search handler via `_resolver_factory=None` kwarg (same pattern as `_http_session_factory` in auth.py)
+- Search handler falls back to Music cog's `._resolver` if bot/cog available, else creates fresh `AudioResolver()`
 - API endpoint handlers access the bot via `request.app.get("bot")`; bot is stored in app via `app["bot"] = bot` in `create_app(bot=bot)`
 - FakeApplication in tests/conftest.py supports dict-style access (`app["key"]`, `app.get("key")`) for storing bot reference
 - New HTTP exception stubs (FakeHTTPBadRequest, FakeHTTPServiceUnavailable) follow same pattern: subclass FakeHTTPException with `reason` kwarg
@@ -47,6 +50,19 @@ Started: Sat Feb 28 10:43:17 PST 2026
   - Avoid `except aiohttp.web.HTTPException: raise` when using MagicMock stubs — use flag variables or restructure to avoid catching your own raises
   - `@asynccontextmanager` + `yield` is more reliable for mocking `async with session.post(...) as resp:` than setting `__aenter__`/`__aexit__` on MagicMock
   - All shared stubs (aiohttp, jwt) belong in `tests/conftest.py`; test files import from there
+---
+
+## 2026-02-28 - US-004
+- Implemented YouTube search API endpoint (`GET /api/search?q={query}&limit={n}`)
+- Added `AudioResolver.search(query, max_results=5)` to `bot/audio/resolver.py` — uses `ytsearch{n}:` prefix with yt_dlp, returns list of dicts with title, url, duration, thumbnail
+- Created `bot/api/search.py` with `handle_search` and `setup_search_routes`; handler uses Music cog's `._resolver` if available, else creates fresh `AudioResolver()`
+- Updated `bot/api/server.py` to import and register search routes via `setup_search_routes(app)`
+- Added 7 tests in `tests/unit/test_resolver.py` for `AudioResolver.search()`; added 15 tests in `tests/test_search_api.py`; all 227 tests pass
+- Files changed: `bot/audio/resolver.py`, `bot/api/search.py` (new), `bot/api/server.py`, `tests/unit/test_resolver.py`, `tests/test_search_api.py` (new)
+- **Learnings for future iterations:**
+  - `handle_search` uses `_resolver_factory=None` kwarg for test injection; production uses Music cog resolver or creates fresh AudioResolver
+  - limit param is clamped to [1, 25] to prevent abuse; default is 5
+  - yt_dlp search returns `{"entries": [...]}` — search() handles None info and missing optional fields gracefully
 ---
 
 ## 2026-02-28 - US-003

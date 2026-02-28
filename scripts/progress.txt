@@ -1,4 +1,5 @@
 ## Codebase Patterns
+- `PlaybackControls` polls `GET /api/playback?guild_id=` every 5s; renders pause/resume/stop based on state; accepts `onStopped` to refresh queue
 - QueueView polls `GET /api/queue?guild_id=` every 5s via `setInterval` in `useEffect`; guild_id comes from `?guild=` URL param passed through App → DashboardPage → QueueView
 - `dashboard/src/components/` is the place for shared/feature React components; pages stay in `dashboard/src/pages/`
 - React app lives in `dashboard/src/`; build with `npm run build` (outputs `dist/`); Dockerfile multi-stage: node:20-alpine builder → nginx:alpine server
@@ -147,4 +148,18 @@ Started: Sat Feb 28 10:43:17 PST 2026
   - `_resolver_factory=None` injectable kwarg pattern used again for testable resolver in `handle_queue_add`
   - `SearchResult` thumbnail field comes from yt_dlp `entry.get("thumbnail", "")` — may be empty string
   - `refreshTrigger` prop on a component + `useEffect([refreshTrigger, stableFn])` is cleaner than `key` remount for triggering imperative reloads
+---
+
+## 2026-02-28 - US-009
+- Built `PlaybackControls` component in `dashboard/src/components/PlaybackControls.tsx`
+- Added `PlaybackState` type and `fetchPlayback`, `pausePlayback`, `resumePlayback`, `stopPlayback` helpers to `dashboard/src/api.ts`
+- Component polls `GET /api/playback` every 5s; shows state badge (Playing/Paused/Stopped) and context-appropriate action buttons (Pause when playing, Resume when paused, Stop when active)
+- Updated `DashboardPage.tsx` to render `PlaybackControls` above `SearchBar` and `QueueView`; `onStopped` callback increments `queueRefreshKey` to refresh queue after stop
+- `refreshTrigger` prop reuses same pattern as `QueueView` for imperative reloads
+- TypeScript build passes; all 235 Python tests pass
+- Files changed: `dashboard/src/api.ts`, `dashboard/src/components/PlaybackControls.tsx` (new), `dashboard/src/pages/DashboardPage.tsx`
+- **Learnings for future iterations:**
+  - Status badge styling via per-state color maps (`badgeColors`, `badgeBorder`, `badgeText`) is clean; reuse this pattern for other state indicators
+  - `styles` object with function values (e.g. `statusBadge: (state) => ({...})`) works well when style depends on props
+  - `onStopped` callback pattern (alongside `refreshTrigger`) cleanly propagates side effects up the component tree
 ---

@@ -45,7 +45,7 @@
     {
       "id": "US-009",
       "title": "Build playback controls bar",
-      "passes": false
+      "passes": true
     }
   ]
 }

@@ -69,6 +69,34 @@ export async function searchYouTube(query: string, limit = 5): Promise<SearchRes
   return data.results;
 }
 
+export type PlaybackState = 'playing' | 'paused' | 'stopped';
+
+/** Fetch the current playback state for a guild. */
+export async function fetchPlayback(guildId: string): Promise<PlaybackState> {
+  const res = await fetch(`/api/playback?guild_id=${encodeURIComponent(guildId)}`);
+  if (!res.ok) throw new Error(`Unexpected status ${res.status}`);
+  const data = await res.json() as { state: PlaybackState };
+  return data.state;
+}
+
+/** Pause playback for a guild. */
+export async function pausePlayback(guildId: string): Promise<void> {
+  const res = await fetch(`/api/playback/pause?guild_id=${encodeURIComponent(guildId)}`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Unexpected status ${res.status}`);
+}
+
+/** Resume playback for a guild. */
+export async function resumePlayback(guildId: string): Promise<void> {
+  const res = await fetch(`/api/playback/resume?guild_id=${encodeURIComponent(guildId)}`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Unexpected status ${res.status}`);
+}
+
+/** Stop playback and disconnect the bot from the voice channel. */
+export async function stopPlayback(guildId: string): Promise<void> {
+  const res = await fetch(`/api/playback/stop?guild_id=${encodeURIComponent(guildId)}`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Unexpected status ${res.status}`);
+}
+
 /** Add a track by URL to the guild queue. */
 export async function addToQueue(guildId: string, url: string): Promise<void> {
   const res = await fetch(`/api/queue/add?guild_id=${encodeURIComponent(guildId)}`, {

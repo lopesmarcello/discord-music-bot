@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { User } from '../api';
 import { logout } from '../api';
+import PlaybackControls from '../components/PlaybackControls';
 import QueueView from '../components/QueueView';
 import SearchBar from '../components/SearchBar';
 
@@ -38,6 +39,11 @@ export default function DashboardPage({ user, guildId, onLogout }: DashboardPage
       <main style={styles.main}>
         {guildId ? (
           <>
+            <PlaybackControls
+              guildId={guildId}
+              refreshTrigger={queueRefreshKey}
+              onStopped={() => setQueueRefreshKey(k => k + 1)}
+            />
             <SearchBar
               guildId={guildId}
               onAdded={() => setQueueRefreshKey(k => k + 1)}

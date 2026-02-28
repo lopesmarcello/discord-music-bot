@@ -40,7 +40,7 @@
     {
       "id": "US-008",
       "title": "Build YouTube search bar and add-to-queue flow",
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-009",

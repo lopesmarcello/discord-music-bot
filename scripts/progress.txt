@@ -132,3 +132,19 @@ Started: Sat Feb 28 10:43:17 PST 2026
   - Track links open in new tab (`target="_blank"`) — add `rel="noreferrer"` for security
   - `key` prop for queue items: use `${track.url}-${index}` since same URL can appear multiple times in queue
 ---
+
+## 2026-02-28 - US-008
+- Built YouTube search bar and add-to-queue flow
+- Added `POST /api/queue/add?guild_id=` endpoint to `bot/api/player.py`; reads JSON body `{url}`, resolves track via music cog's `_resolver`, adds to queue, starts playback if idle
+- Added `SearchResult` interface and `searchYouTube()` / `addToQueue()` helpers to `dashboard/src/api.ts`
+- Created `dashboard/src/components/SearchBar.tsx`: search form, results list with "+ Add" buttons, error/loading states
+- Added `refreshTrigger?: number` prop to `QueueView` — second `useEffect` calls `loadQueue()` when trigger changes (avoids remount flash vs using `key`)
+- Updated `DashboardPage.tsx`: added `queueRefreshKey` state, renders `<SearchBar onAdded={...} />` above `<QueueView refreshTrigger={...} />`
+- Added 8 tests for `handle_queue_add` in `tests/test_player_api.py`; all 235 Python tests pass; TypeScript build passes
+- Files changed: `bot/api/player.py`, `tests/test_player_api.py`, `dashboard/src/api.ts`, `dashboard/src/components/SearchBar.tsx` (new), `dashboard/src/components/QueueView.tsx`, `dashboard/src/pages/DashboardPage.tsx`
+- **Learnings for future iterations:**
+  - `request.json()` in aiohttp is async — use `AsyncMock(return_value=body)` to stub it in tests
+  - `_resolver_factory=None` injectable kwarg pattern used again for testable resolver in `handle_queue_add`
+  - `SearchResult` thumbnail field comes from yt_dlp `entry.get("thumbnail", "")` — may be empty string
+  - `refreshTrigger` prop on a component + `useEffect([refreshTrigger, stableFn])` is cleaner than `key` remount for triggering imperative reloads
+---

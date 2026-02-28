@@ -35,7 +35,7 @@
     {
       "id": "US-007",
       "title": "Build main dashboard queue view",
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-008",

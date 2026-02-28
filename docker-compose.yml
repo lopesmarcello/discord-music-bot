@@ -3,3 +3,13 @@ services:
     build: .
     env_file: .env
     restart: unless-stopped
+    expose:
+      - "8080"
+
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    depends_on:
+      - bot

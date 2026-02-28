@@ -70,6 +70,27 @@ class AudioResolver:
     # Public API
     # ------------------------------------------------------------------
 
+    def search(self, query: str, max_results: int = 5) -> list:
+        """Search YouTube for videos matching a query.
+
+        Returns a list of result dicts with title, url, duration, thumbnail.
+        """
+        YoutubeDL = self._get_ytdl_class()
+        ydl_opts = {"format": "bestaudio/best", "noplaylist": True, "quiet": True}
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch{max_results}:{query}", download=False)
+        entries = (info or {}).get("entries", [])
+        results = []
+        for entry in entries:
+            if entry:
+                results.append({
+                    "title": entry.get("title", ""),
+                    "url": entry.get("webpage_url", ""),
+                    "duration": entry.get("duration", 0),
+                    "thumbnail": entry.get("thumbnail", ""),
+                })
+        return results
+
     def resolve(self, query: str) -> AudioTrack:
         """Resolve a query or URL to an AudioTrack.
 

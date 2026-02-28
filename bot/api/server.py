@@ -16,12 +16,14 @@ def create_app(bot=None) -> "aiohttp.web.Application":
 
     from bot.api.auth import make_jwt_middleware, setup_auth_routes  # noqa: PLC0415
     from bot.api.player import setup_player_routes  # noqa: PLC0415
+    from bot.api.search import setup_search_routes  # noqa: PLC0415
 
     app = aiohttp.web.Application(middlewares=[make_jwt_middleware()])
     if bot is not None:
         app["bot"] = bot
     setup_auth_routes(app)
     setup_player_routes(app)
+    setup_search_routes(app)
     return app
 
 

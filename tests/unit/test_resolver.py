@@ -240,3 +240,96 @@ class TestGetYtdlClassLazyImport:
         assert result is mock_ytdl_module.YoutubeDL
 
 
+# ---------------------------------------------------------------------------
+# AudioResolver – search()
+# ---------------------------------------------------------------------------
+
+
+def _make_ydl_search_class(entries: list) -> MagicMock:
+    """Return a mock YoutubeDL class that returns a multi-entry search result."""
+    mock_class = MagicMock()
+    mock_ydl = mock_class.return_value.__enter__.return_value
+    mock_ydl.extract_info.return_value = {"entries": entries}
+    return mock_class
+
+
+def _make_entry(
+    title="Track",
+    webpage_url="https://youtube.com/watch?v=abc",
+    duration=180,
+    thumbnail="https://i.ytimg.com/vi/abc/default.jpg",
+) -> dict:
+    return {
+        "title": title,
+        "webpage_url": webpage_url,
+        "url": "https://stream.example.com/audio.webm",
+        "duration": duration,
+        "thumbnail": thumbnail,
+    }
+
+
+class TestSearch:
+    def test_returns_list_of_dicts(self):
+        entries = [_make_entry("Song 1"), _make_entry("Song 2")]
+        mock_ytdl = _make_ydl_search_class(entries)
+        resolver = AudioResolver(ytdl_class=mock_ytdl)
+        results = resolver.search("test query")
+        assert isinstance(results, list)
+        assert len(results) == 2
+
+    def test_result_has_expected_fields(self):
+        entry = _make_entry(
+            title="Cool Song",
+            webpage_url="https://youtube.com/watch?v=cool",
+            duration=240,
+            thumbnail="https://i.ytimg.com/vi/cool/default.jpg",
+        )
+        mock_ytdl = _make_ydl_search_class([entry])
+        resolver = AudioResolver(ytdl_class=mock_ytdl)
+        results = resolver.search("cool song")
+        assert results[0] == {
+            "title": "Cool Song",
+            "url": "https://youtube.com/watch?v=cool",
+            "duration": 240,
+            "thumbnail": "https://i.ytimg.com/vi/cool/default.jpg",
+        }
+
+    def test_uses_ytsearch_prefix(self):
+        mock_ytdl = _make_ydl_search_class([_make_entry()])
+        resolver = AudioResolver(ytdl_class=mock_ytdl)
+        resolver.search("my query", max_results=5)
+        mock_ydl = mock_ytdl.return_value.__enter__.return_value
+        call_arg = mock_ydl.extract_info.call_args[0][0]
+        assert call_arg == "ytsearch5:my query"
+
+    def test_max_results_passed_to_prefix(self):
+        mock_ytdl = _make_ydl_search_class([_make_entry()] * 10)
+        resolver = AudioResolver(ytdl_class=mock_ytdl)
+        resolver.search("query", max_results=10)
+        mock_ydl = mock_ytdl.return_value.__enter__.return_value
+        call_arg = mock_ydl.extract_info.call_args[0][0]
+        assert call_arg.startswith("ytsearch10:")
+
+    def test_empty_entries_returns_empty_list(self):
+        mock_ytdl = _make_ydl_search_class([])
+        resolver = AudioResolver(ytdl_class=mock_ytdl)
+        results = resolver.search("no results query")
+        assert results == []
+
+    def test_none_info_returns_empty_list(self):
+        mock_class = MagicMock()
+        mock_ydl = mock_class.return_value.__enter__.return_value
+        mock_ydl.extract_info.return_value = None
+        resolver = AudioResolver(ytdl_class=mock_class)
+        results = resolver.search("query")
+        assert results == []
+
+    def test_missing_optional_fields_use_defaults(self):
+        entry = {"title": "Minimal", "webpage_url": "https://youtube.com/watch?v=m"}
+        mock_ytdl = _make_ydl_search_class([entry])
+        resolver = AudioResolver(ytdl_class=mock_ytdl)
+        results = resolver.search("minimal")
+        assert results[0]["duration"] == 0
+        assert results[0]["thumbnail"] == ""
+
+

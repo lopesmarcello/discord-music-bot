@@ -38,9 +38,11 @@ export default function App() {
     return <LoginPage guildId={guildId} error={error} />;
   }
 
+  const guildId = getQueryParam('guild');
   return (
     <DashboardPage
       user={auth.user}
+      guildId={guildId}
       onLogout={() => setAuth({ status: 'unauthenticated' })}
     />
   );

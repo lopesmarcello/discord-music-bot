@@ -1,12 +1,14 @@
 import type { User } from '../api';
 import { logout } from '../api';
+import QueueView from '../components/QueueView';
 
 interface DashboardPageProps {
   user: User;
+  guildId?: string;
   onLogout: () => void;
 }
 
-export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
+export default function DashboardPage({ user, guildId, onLogout }: DashboardPageProps) {
   async function handleLogout() {
     await logout();
     onLogout();
@@ -30,10 +32,13 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
       </header>
 
       <main style={styles.main}>
-        <div style={styles.placeholder}>
-          <h2 style={styles.placeholderTitle}>Queue &amp; Playback</h2>
-          <p style={styles.placeholderText}>Coming soon — queue view will appear here.</p>
-        </div>
+        {guildId ? (
+          <QueueView guildId={guildId} />
+        ) : (
+          <div style={styles.noGuild}>
+            <p>No guild selected. Please log in again with a guild link.</p>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -88,21 +93,13 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '0 auto',
     padding: '40px 24px',
   },
-  placeholder: {
+  noGuild: {
     background: 'rgba(255,255,255,0.05)',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: 12,
     padding: '48px',
     textAlign: 'center',
-  },
-  placeholderTitle: {
-    margin: '0 0 12px',
-    fontSize: 22,
-    fontWeight: 600,
-  },
-  placeholderText: {
     color: 'rgba(255,255,255,0.5)',
-    margin: 0,
     fontSize: 15,
   },
 };

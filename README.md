@@ -7,8 +7,7 @@ A self-hosted Discord music bot written in Python that streams audio from YouTub
 - Stream audio from YouTube URLs, YouTube search queries, and SoundCloud URLs
 - Playback controls: play, pause, resume, stop, skip
 - Per-guild song queue with add/view/clear operations
-- Both slash commands (`/play`) and prefix commands (`!play`)
-- Configurable command prefix via environment variable
+- Slash commands (`/play`)
 
 ## Requirements
 
@@ -20,7 +19,7 @@ A self-hosted Discord music bot written in Python that streams audio from YouTub
 ### 1. Clone the repository
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/lopesmarcello/discord-music-bot
 cd discord-music-bot
 ```
 
@@ -42,7 +41,9 @@ Edit `.env` with your values:
 
 ```
 DISCORD_TOKEN=your_discord_bot_token
-COMMAND_PREFIX=!
+COMMAND_PREFIX=! 
+
+*command prefix may not work sometimes, still workingo on it
 ```
 
 #### Getting credentials
@@ -119,10 +120,8 @@ docker compose up -d --build
 
 ## Supported Sources
 
-- **YouTube**: Direct URLs or search queries
+- **YouTube**: Direct URLs
 - **SoundCloud**: Direct track URLs
-
-> **Note:** Spotify URLs are not supported. To play a Spotify track, search by song name instead, e.g. `/play artist - song title`.
 
 ## Project Structure
 

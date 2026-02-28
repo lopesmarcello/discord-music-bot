@@ -30,7 +30,7 @@
     {
       "id": "US-006",
       "title": "Build React app skeleton with login page",
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-007",

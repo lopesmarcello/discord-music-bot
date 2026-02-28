@@ -1,4 +1,8 @@
 ## Codebase Patterns
+- React app lives in `dashboard/src/`; build with `npm run build` (outputs `dist/`); Dockerfile multi-stage: node:20-alpine builder → nginx:alpine server
+- Auth is cookie-based (`session` httponly cookie); React app calls `GET /auth/me` to check auth; login via redirect to `/auth/discord?guild_id=`
+- `dashboard/src/api.ts` exports `fetchMe()`, `logout()`, `loginUrl()`; `App.tsx` orchestrates auth state; pages are `LoginPage` and `DashboardPage`
+- To add `dashboard/` gitignore: `node_modules/` and `dist/` must be excluded; `package-lock.json` should be committed
 - Dashboard nginx reverse-proxies `/api/` and `/auth/` to `bot:8080`; all other routes serve `index.html` (SPA fallback)
 - YouTube search: `AudioResolver.search(query, max_results=5)` uses `ytsearch{n}:` prefix; returns list of dicts with title, url, duration, thumbnail
 - Injectable resolver in search handler via `_resolver_factory=None` kwarg (same pattern as `_http_session_factory` in auth.py)
@@ -94,4 +98,21 @@ Started: Sat Feb 28 10:43:17 PST 2026
   - Docker Compose default network allows services to reach each other by service name (e.g., `http://bot:8080`)
   - `expose:` in Compose makes the port available to sibling services only (not host); `ports:` maps to host
   - US-006 should replace `dashboard/index.html` with the Vite React build output and update `dashboard/Dockerfile` to a multi-stage build
+---
+
+## 2026-02-28 - US-006
+- Built Vite + React + TypeScript app skeleton in `dashboard/`
+- `src/api.ts`: `fetchMe()` (GET /auth/me), `logout()` (POST /auth/logout), `loginUrl(guildId?)`
+- `src/App.tsx`: auth state machine (loading → unauthenticated | authenticated); calls fetchMe on mount
+- `src/pages/LoginPage.tsx`: "Login with Discord" button → `/auth/discord`; shows error messages from `?error=` URL param
+- `src/pages/DashboardPage.tsx`: header with user avatar/username/logout; placeholder main area for US-007
+- Updated `dashboard/Dockerfile` to multi-stage: node:20-alpine builds `npm run build`, nginx:alpine serves `dist/`
+- Added `dashboard/.gitignore` to exclude `node_modules/` and `dist/`; package-lock.json committed
+- TypeScript build + all 227 Python tests pass
+- Files changed: `dashboard/Dockerfile`, `dashboard/index.html`, `dashboard/package.json`, `dashboard/package-lock.json`, `dashboard/.gitignore`, `dashboard/tsconfig*.json`, `dashboard/vite.config.ts`, `dashboard/src/` (all new)
+- **Learnings for future iterations:**
+  - `dashboard/src/vite-env.d.ts` with `/// <reference types="vite/client" />` is required for CSS imports to typecheck
+  - Auth flow: `fetchMe()` → 200 = logged in, 401 = not logged in; cookie is httponly so JS cannot read it directly
+  - Discord avatar URL: `https://cdn.discordapp.com/avatars/{id}/{avatar}.png`
+  - `tsconfig.app.json` has `noUnusedLocals: true` — be careful not to declare unused vars
 ---

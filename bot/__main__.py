@@ -13,7 +13,7 @@ async def _run(token: str) -> None:
 
     from bot.api.server import create_app, start_api_server  # noqa: PLC0415
 
-    app = create_app()
+    app = create_app(bot=bot)
     runner = await start_api_server(app, "0.0.0.0", port)
     try:
         async with bot:

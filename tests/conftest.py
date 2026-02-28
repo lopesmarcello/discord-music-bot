@@ -36,6 +36,18 @@ class FakeHTTPUnauthorized(FakeHTTPException):
     pass
 
 
+class FakeHTTPBadRequest(FakeHTTPException):
+    def __init__(self, *, reason: str = ""):
+        super().__init__(reason)
+        self.reason = reason
+
+
+class FakeHTTPServiceUnavailable(FakeHTTPException):
+    def __init__(self, *, reason: str = ""):
+        super().__init__(reason)
+        self.reason = reason
+
+
 class FakeResponse:
     def __init__(self, text="", content_type="text/plain"):
         self.text = text
@@ -61,6 +73,16 @@ class FakeApplication:
     def __init__(self, middlewares=None):
         self.middlewares = middlewares or []
         self.router = FakeRouter()
+        self._data: dict = {}
+
+    def __setitem__(self, key, value):
+        self._data[key] = value
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
 
 
 class FakeAppRunner:
@@ -84,6 +106,8 @@ mock_web.AppRunner = FakeAppRunner
 mock_web.TCPSite = FakeTCPSite
 mock_web.HTTPFound = FakeHTTPFound
 mock_web.HTTPUnauthorized = FakeHTTPUnauthorized
+mock_web.HTTPBadRequest = FakeHTTPBadRequest
+mock_web.HTTPServiceUnavailable = FakeHTTPServiceUnavailable
 mock_web.HTTPException = FakeHTTPException
 mock_web.Response = FakeResponse
 

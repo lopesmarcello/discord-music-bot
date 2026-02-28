@@ -7,14 +7,21 @@ if TYPE_CHECKING:
     import aiohttp.web
 
 
-def create_app() -> "aiohttp.web.Application":
-    """Create and return the aiohttp web application."""
+def create_app(bot=None) -> "aiohttp.web.Application":
+    """Create and return the aiohttp web application.
+
+    Pass the Discord bot instance so queue/playback routes can access it.
+    """
     import aiohttp.web  # noqa: PLC0415
 
     from bot.api.auth import make_jwt_middleware, setup_auth_routes  # noqa: PLC0415
+    from bot.api.player import setup_player_routes  # noqa: PLC0415
 
     app = aiohttp.web.Application(middlewares=[make_jwt_middleware()])
+    if bot is not None:
+        app["bot"] = bot
     setup_auth_routes(app)
+    setup_player_routes(app)
     return app
 
 

@@ -4,43 +4,14 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
-# ---------------------------------------------------------------------------
-# Stub aiohttp.web if not installed (no network in CI)
-# ---------------------------------------------------------------------------
-
-class _FakeApplication:
-    """Minimal Application stub."""
-
-
-class _FakeAppRunner:
-    """Minimal AppRunner stub."""
-    def __init__(self, app):
-        self.app = app
-        self.setup = AsyncMock()
-        self.cleanup = AsyncMock()
-
-
-class _FakeTCPSite:
-    """Minimal TCPSite stub."""
-    def __init__(self, runner, host, port):
-        self.runner = runner
-        self.host = host
-        self.port = port
-        self.start = AsyncMock()
-
-
-_mock_web = MagicMock()
-_mock_web.Application = _FakeApplication
-_mock_web.AppRunner = _FakeAppRunner
-_mock_web.TCPSite = _FakeTCPSite
-
-_mock_aiohttp = MagicMock()
-_mock_aiohttp.web = _mock_web
-
-sys.modules.setdefault("aiohttp", _mock_aiohttp)
-sys.modules.setdefault("aiohttp.web", _mock_web)
+# Stubs for aiohttp are registered in tests/conftest.py before this file loads.
+# Import the stub classes from sys.modules so we use the same objects everywhere.
+_mock_web = sys.modules["aiohttp.web"]
+_FakeApplication = _mock_web.Application
+_FakeAppRunner = _mock_web.AppRunner
+_FakeTCPSite = _mock_web.TCPSite
 
 from bot.api.server import create_app, start_api_server  # noqa: E402
 
@@ -81,10 +52,10 @@ class TestStartApiServer:
         app = create_app()
 
         created_sites = []
-        original_tcp_site = _mock_web.TCPSite
 
         def capturing_tcp_site(runner, host, port):
-            site = _FakeTCPSite(runner, host, port)
+            from tests.conftest import FakeTCPSite  # noqa: PLC0415
+            site = FakeTCPSite(runner, host, port)
             created_sites.append(site)
             return site
 
@@ -100,8 +71,9 @@ class TestStartApiServer:
         captured = []
 
         def capturing_tcp_site(runner, host, port):
+            from tests.conftest import FakeTCPSite  # noqa: PLC0415
             captured.append((host, port))
-            return _FakeTCPSite(runner, host, port)
+            return FakeTCPSite(runner, host, port)
 
         with patch.object(_mock_web, "TCPSite", side_effect=capturing_tcp_site):
             asyncio.run(start_api_server(app, "0.0.0.0", 8080))
@@ -114,8 +86,9 @@ class TestStartApiServer:
         captured = []
 
         def capturing_tcp_site(runner, host, port):
+            from tests.conftest import FakeTCPSite  # noqa: PLC0415
             captured.append((host, port))
-            return _FakeTCPSite(runner, host, port)
+            return FakeTCPSite(runner, host, port)
 
         with patch.object(_mock_web, "TCPSite", side_effect=capturing_tcp_site):
             asyncio.run(start_api_server(app, "0.0.0.0", 9090))

@@ -1,40 +1,51 @@
 {
-  "title": "Fix PyNaCl Missing Dependency for Discord Voice",
-  "branchName": "ralph/discord-music-bot",
-  "description": "The Discord music bot crashes with `RuntimeError: PyNaCl library needed in order to use voice` whenever a user runs `/play`. `discord.py` requires `PyNaCl` for all voice channel operations (encryption of the audio stream). The library is missing from `pyproject.toml` and therefore never installed into the Docker image.",
-  "userStories": [
+  "title": "Web Dashboard for Discord Music Bot",
+  "branchName": "main",
+  "stories": [
     {
       "id": "US-001",
-      "title": "Add PyNaCl to Python dependencies",
-      "passes": true,
-      "description": "As a developer, I want PyNaCl declared in pyproject.toml so it is installed automatically in every environment (local, CI, Docker).",
-      "acceptanceCriteria": [
-        "Change 'discord.py>=2.0' to 'discord.py[voice]>=2.0' in pyproject.toml (the [voice] extra pulls in PyNaCl as a declared transitive dependency)",
-        "pip install . in a clean virtualenv succeeds and python -c 'import nacl' exits without error"
-      ]
+      "title": "Embed HTTP API server in the bot",
+      "passes": true
     },
     {
       "id": "US-002",
-      "title": "Add libsodium system package to the Dockerfile",
-      "passes": true,
-      "description": "As a developer, I want the Docker image to include the libsodium system library so PyNaCl can link against it reliably on Debian/Ubuntu-based images.",
-      "acceptanceCriteria": [
-        "libsodium23 is added to the apt-get install line in Dockerfile alongside ffmpeg",
-        "docker build . completes without errors",
-        "docker run starts the bot without import errors related to nacl/libsodium"
-      ]
+      "title": "Implement Discord OAuth2 authentication in the API",
+      "passes": true
     },
     {
       "id": "US-003",
-      "title": "End-to-end smoke verification",
-      "passes": true,
-      "description": "As a developer, I want to confirm that a rebuilt container lets the bot join a voice channel so the fix is verified in the real runtime environment.",
-      "acceptanceCriteria": [
-        "docker compose up --build rebuilds the image successfully",
-        "Bot starts and connects to the Discord gateway",
-        "Running /play does NOT produce RuntimeError: PyNaCl library needed in order to use voice",
-        "Bot joins the voice channel and begins audio playback"
-      ]
+      "title": "Implement queue and playback API endpoints",
+      "passes": false
+    },
+    {
+      "id": "US-004",
+      "title": "Implement YouTube search API endpoint",
+      "passes": false
+    },
+    {
+      "id": "US-005",
+      "title": "Add dashboard service to Docker Compose",
+      "passes": false
+    },
+    {
+      "id": "US-006",
+      "title": "Build React app skeleton with login page",
+      "passes": false
+    },
+    {
+      "id": "US-007",
+      "title": "Build main dashboard queue view",
+      "passes": false
+    },
+    {
+      "id": "US-008",
+      "title": "Build YouTube search bar and add-to-queue flow",
+      "passes": false
+    },
+    {
+      "id": "US-009",
+      "title": "Build playback controls bar",
+      "passes": false
     }
   ]
 }

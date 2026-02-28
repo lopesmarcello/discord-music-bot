@@ -12,6 +12,7 @@ dependencies = [
     "yt-dlp",
     "python-dotenv",
     "aiohttp>=3.9",
+    "PyJWT>=2.0",
 ]
 
 [project.optional-dependencies]

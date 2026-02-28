@@ -1,35 +1,47 @@
 ## Codebase Patterns
-- Use `discord.py[voice]>=2.0` (not bare `discord.py>=2.0`) so PyNaCl is installed via the voice extras
-- Dockerfile base image is `python:3.12-slim`; must add `libsodium23` to apt-get for PyNaCl native linking
-- Tests mock all discord.VoiceClient interactions - no real voice connection needed to run tests
-- pyproject.toml uses `setuptools.build_meta` build backend; use `pip install .` (not `-e .`) in Docker
-- Config smoke tests (tests/test_smoke_config.py) use only stdlib (tomllib, pathlib, re) - runnable without pip install
----
+- Python test environment: `/tmp/bot-venv/bin/python` with `PYTHONPATH=/tmp/pypackages:/workspace`
+- Run tests: `PYTHONPATH=/tmp/pypackages:/workspace /tmp/bot-venv/bin/python -m pytest /workspace/tests/ -v`
+- No network access in the container — use lazy imports and sys.modules stubs for packages not in bot-venv
+- Integration tests mock discord via conftest.py in `tests/integration/` using sys.modules injection
+- For missing packages (like aiohttp, jwt), inject stubs into sys.modules before importing bot modules in tests
+- bot/__main__.py pattern: use `asyncio.run(_run(token))` with async _run() to start multiple services alongside bot
+- Use lazy imports (`import X  # noqa: PLC0415` inside functions) to defer package requirements to runtime
+- Shared aiohttp/jwt stubs live in `tests/conftest.py` (root-level); test files import from there to avoid stub conflicts when multiple files are collected
+- For aiohttp async context managers in tests, use `@asynccontextmanager` + `yield` pattern instead of MagicMock.__aenter__ (more reliable)
+- When multiple test files stub the same sys.module, use `sys.modules.setdefault` in conftest.py only, then import from sys.modules in test files
+- `except SomeClass:` fails in tests when SomeClass is a MagicMock — always use real exception subclasses in stubs
+- For injectable HTTP sessions, add `_http_session_factory=None` kwarg to handlers; production code falls back to `aiohttp.ClientSession`
 
 # Ralph Progress Log
-Started: Fri Feb 27 15:38:49 PST 2026
+Started: Sat Feb 28 10:43:17 PST 2026
 ---
 
-## 2026-02-27 - US-001 / US-002
-- Initialized new PRD (prd-fix-pynacl-voice-dependency.md → scripts/prd.json) for PyNaCl missing dependency fix
-- US-001: Changed `discord.py>=2.0` to `discord.py[voice]>=2.0` in pyproject.toml to pull in PyNaCl via the voice extras
-- US-002: Added `libsodium23` to apt-get install line in Dockerfile alongside ffmpeg
-- Files changed: pyproject.toml, Dockerfile, scripts/prd.json, scripts/progress.txt
+## 2026-02-28 - US-001
+- Implemented aiohttp HTTP API server embedded in bot process
+- Added `aiohttp>=3.9` to `pyproject.toml` dependencies
+- Created `bot/api/__init__.py` and `bot/api/server.py` with `create_app()` and `start_api_server()`
+- Updated `bot/__main__.py` to use async `_run()` pattern starting aiohttp server alongside discord bot
+- Added `tests/test_api_server.py` with 9 tests; all 152 tests pass
+- Files changed: `pyproject.toml`, `bot/__main__.py`, `bot/api/__init__.py`, `bot/api/server.py`, `tests/test_api_server.py`
 - **Learnings for future iterations:**
-  - The `[voice]` extra on discord.py is the idiomatic way to include PyNaCl; it pins a compatible version automatically
-  - `libsodium23` is the correct Debian/Ubuntu package name for the shared library PyNaCl links against
-  - All tests use MagicMock for VoiceClient so no actual PyNaCl import is needed at test time
-  - US-003 (end-to-end Docker smoke test) requires a running Docker daemon and Discord bot token; cannot be auto-verified in this environment - manual verification needed
+  - No network access in devcontainer — can't install packages via pip; must use lazy imports + sys.modules stubs in tests
+  - Python env is at `/tmp/bot-venv/bin/python`; pytest is in `/tmp/pypackages`
+  - Lazy imports (inside functions) let modules load without requiring package installed, defer errors to call time
+  - Pattern for aiohttp-less tests: inject fake classes into sys.modules before importing bot.api modules
 ---
 
-## 2026-02-27 - US-003
-- Added tests/test_smoke_config.py: static configuration smoke verification using stdlib only (tomllib, pathlib, re)
-- Tests verify: pyproject.toml has `discord.py[voice]>=2.0`, Dockerfile has `libsodium23`, docker-compose.yml exists with `build:` and `env_file`
-- All 7 configuration assertions verified manually via python3 (no pip/pytest needed in this environment)
-- Files changed: tests/test_smoke_config.py, scripts/prd.json, scripts/progress.txt
+## 2026-02-28 - US-002
+- Implemented Discord OAuth2 authentication in the API
+- Created `bot/api/auth.py` with: `encode_jwt`/`decode_jwt`, `handle_auth_discord`, `handle_auth_callback`, `handle_auth_me`, `handle_auth_logout`, `make_jwt_middleware`, `setup_auth_routes`
+- Updated `bot/api/server.py` to wire in JWT middleware and auth routes via `create_app()`
+- Added `PyJWT>=2.0` to `pyproject.toml` dependencies
+- Created `tests/conftest.py` (root-level) with shared aiohttp/jwt stubs — prevents stub conflicts when multiple test files collected
+- Updated `tests/test_api_server.py` to use shared stubs from conftest
+- Added `tests/test_auth.py` with 23 tests covering all auth routes and middleware; all 175 tests pass
+- Files changed: `bot/api/auth.py` (new), `bot/api/server.py`, `pyproject.toml`, `tests/conftest.py` (new), `tests/test_api_server.py`, `tests/test_auth.py` (new), `scripts/prd.json` (recreated), `tasks/prd-web-dashboard.md` (staged)
 - **Learnings for future iterations:**
-  - The devcontainer environment has python3.11 stdlib but no pip, pytest, or Docker daemon
-  - Standard library `tomllib` (python 3.11+) can parse pyproject.toml without extra packages
-  - Static config verification tests (stdlib only) can run with `python3` directly when pytest is unavailable
-  - Manual Docker smoke test still required for full end-to-end verification: `docker compose up --build` then test /play in a voice channel
+  - `handle_auth_callback` uses injectable `_http_session_factory` kwarg for testing; production defaults to `aiohttp.ClientSession`
+  - Avoid `except aiohttp.web.HTTPException: raise` when using MagicMock stubs — use flag variables or restructure to avoid catching your own raises
+  - `@asynccontextmanager` + `yield` is more reliable for mocking `async with session.post(...) as resp:` than setting `__aenter__`/`__aexit__` on MagicMock
+  - All shared stubs (aiohttp, jwt) belong in `tests/conftest.py`; test files import from there
 ---

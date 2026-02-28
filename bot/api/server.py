@@ -11,7 +11,11 @@ def create_app() -> "aiohttp.web.Application":
     """Create and return the aiohttp web application."""
     import aiohttp.web  # noqa: PLC0415
 
-    return aiohttp.web.Application()
+    from bot.api.auth import make_jwt_middleware, setup_auth_routes  # noqa: PLC0415
+
+    app = aiohttp.web.Application(middlewares=[make_jwt_middleware()])
+    setup_auth_routes(app)
+    return app
 
 
 async def start_api_server(

@@ -1,165 +1,30 @@
-## Codebase Patterns
-- `PlaybackControls` polls `GET /api/playback?guild_id=` every 5s; renders pause/resume/stop based on state; accepts `onStopped` to refresh queue
-- QueueView polls `GET /api/queue?guild_id=` every 5s via `setInterval` in `useEffect`; guild_id comes from `?guild=` URL param passed through App → DashboardPage → QueueView
-- `dashboard/src/components/` is the place for shared/feature React components; pages stay in `dashboard/src/pages/`
-- React app lives in `dashboard/src/`; build with `npm run build` (outputs `dist/`); Dockerfile multi-stage: node:20-alpine builder → nginx:alpine server
-- Auth is cookie-based (`session` httponly cookie); React app calls `GET /auth/me` to check auth; login via redirect to `/auth/discord?guild_id=`
-- `dashboard/src/api.ts` exports `fetchMe()`, `logout()`, `loginUrl()`; `App.tsx` orchestrates auth state; pages are `LoginPage` and `DashboardPage`
-- To add `dashboard/` gitignore: `node_modules/` and `dist/` must be excluded; `package-lock.json` should be committed
-- Dashboard nginx reverse-proxies `/api/` and `/auth/` to `bot:8080`; all other routes serve `index.html` (SPA fallback)
-- YouTube search: `AudioResolver.search(query, max_results=5)` uses `ytsearch{n}:` prefix; returns list of dicts with title, url, duration, thumbnail
-- Injectable resolver in search handler via `_resolver_factory=None` kwarg (same pattern as `_http_session_factory` in auth.py)
-- Search handler falls back to Music cog's `._resolver` if bot/cog available, else creates fresh `AudioResolver()`
-- API endpoint handlers access the bot via `request.app.get("bot")`; bot is stored in app via `app["bot"] = bot` in `create_app(bot=bot)`
-- FakeApplication in tests/conftest.py supports dict-style access (`app["key"]`, `app.get("key")`) for storing bot reference
-- New HTTP exception stubs (FakeHTTPBadRequest, FakeHTTPServiceUnavailable) follow same pattern: subclass FakeHTTPException with `reason` kwarg
-- Python test environment: `/tmp/bot-venv/bin/python` with `PYTHONPATH=/tmp/pypackages:/workspace`
-- Run tests: `PYTHONPATH=/tmp/pypackages:/workspace /tmp/bot-venv/bin/python -m pytest /workspace/tests/ -v`
-- No network access in the container — use lazy imports and sys.modules stubs for packages not in bot-venv
-- Integration tests mock discord via conftest.py in `tests/integration/` using sys.modules injection
-- For missing packages (like aiohttp, jwt), inject stubs into sys.modules before importing bot modules in tests
-- bot/__main__.py pattern: use `asyncio.run(_run(token))` with async _run() to start multiple services alongside bot
-- Use lazy imports (`import X  # noqa: PLC0415` inside functions) to defer package requirements to runtime
-- Shared aiohttp/jwt stubs live in `tests/conftest.py` (root-level); test files import from there to avoid stub conflicts when multiple files are collected
-- For aiohttp async context managers in tests, use `@asynccontextmanager` + `yield` pattern instead of MagicMock.__aenter__ (more reliable)
-- When multiple test files stub the same sys.module, use `sys.modules.setdefault` in conftest.py only, then import from sys.modules in test files
-- `except SomeClass:` fails in tests when SomeClass is a MagicMock — always use real exception subclasses in stubs
-- For injectable HTTP sessions, add `_http_session_factory=None` kwarg to handlers; production code falls back to `aiohttp.ClientSession`
-
 # Ralph Progress Log
-Started: Sat Feb 28 10:43:17 PST 2026
+Started: Sat Feb 28 16:03:28 PST 2026
+---
+
+## Codebase Patterns
+- Tests use `PYTHONPATH=/tmp/pypackages:/workspace /usr/bin/python3.11 -m pytest tests/ -x -q` (no pytest in PATH; packages in /tmp/pypackages)
+- `tests/conftest.py` stubs `aiohttp`, `aiohttp.web`, and `jwt` so tests run without real packages installed
+- `mock_web.middleware = lambda fn: fn` — aiohttp.web.middleware decorator must be a pass-through in the stub
+- Music cog per-guild state uses `dict[int, T]` keyed by guild_id; same pattern for `_current_tracks`, `_voice_managers`, `_skipping`
+- Skip race-condition guard: set `_skipping[guild_id] = True` BEFORE `vm.stop()`, clear AFTER `_play_next()` completes
+- `_make_on_track_end` callback runs in discord.py audio thread — GIL protects dict reads/writes for the `_skipping` flag
+
 ---
 
 ## 2026-02-28 - US-001
-- Implemented aiohttp HTTP API server embedded in bot process
-- Added `aiohttp>=3.9` to `pyproject.toml` dependencies
-- Created `bot/api/__init__.py` and `bot/api/server.py` with `create_app()` and `start_api_server()`
-- Updated `bot/__main__.py` to use async `_run()` pattern starting aiohttp server alongside discord bot
-- Added `tests/test_api_server.py` with 9 tests; all 152 tests pass
-- Files changed: `pyproject.toml`, `bot/__main__.py`, `bot/api/__init__.py`, `bot/api/server.py`, `tests/test_api_server.py`
+- What was implemented: Added `_skipping: dict[int, bool]` flag to the `Music` cog to prevent the `on_track_end` callback from scheduling a second `_play_next` during an explicit skip, eliminating the double-`_play_next` race condition that caused the dashboard to reset to empty state.
+- Files changed:
+  - `bot/cogs/music.py`: Added `_skipping` attribute; guarded `_make_on_track_end` callback; set/clear flag in `Music.skip`
+  - `bot/api/player.py`: Set/clear `_skipping` flag in `handle_queue_skip`
+  - `bot/api/auth.py`: Staged pre-existing change (moved `@aiohttp.web.middleware` decorator outside inner function)
+  - `tests/conftest.py`: Fixed `mock_web.middleware` to be a pass-through decorator (was MagicMock, broke auth tests)
+  - `tests/integration/test_skip_command.py`: Added tests for flag initialization, flag cleared after skip, and callback no-op when skipping
+  - `tests/test_player_api.py`: Added tests verifying flag is set before vm.stop() and cleared after _play_next
+  - `scripts/prd.json`: Created from `tasks/prd-dashboard-reset-on-skip.md`
+  - `tasks/prd-dashboard-reset-on-skip.md`: Added to repo
 - **Learnings for future iterations:**
-  - No network access in devcontainer — can't install packages via pip; must use lazy imports + sys.modules stubs in tests
-  - Python env is at `/tmp/bot-venv/bin/python`; pytest is in `/tmp/pypackages`
-  - Lazy imports (inside functions) let modules load without requiring package installed, defer errors to call time
-  - Pattern for aiohttp-less tests: inject fake classes into sys.modules before importing bot.api modules
----
-
-## 2026-02-28 - US-002
-- Implemented Discord OAuth2 authentication in the API
-- Created `bot/api/auth.py` with: `encode_jwt`/`decode_jwt`, `handle_auth_discord`, `handle_auth_callback`, `handle_auth_me`, `handle_auth_logout`, `make_jwt_middleware`, `setup_auth_routes`
-- Updated `bot/api/server.py` to wire in JWT middleware and auth routes via `create_app()`
-- Added `PyJWT>=2.0` to `pyproject.toml` dependencies
-- Created `tests/conftest.py` (root-level) with shared aiohttp/jwt stubs — prevents stub conflicts when multiple test files collected
-- Updated `tests/test_api_server.py` to use shared stubs from conftest
-- Added `tests/test_auth.py` with 23 tests covering all auth routes and middleware; all 175 tests pass
-- Files changed: `bot/api/auth.py` (new), `bot/api/server.py`, `pyproject.toml`, `tests/conftest.py` (new), `tests/test_api_server.py`, `tests/test_auth.py` (new), `scripts/prd.json` (recreated), `tasks/prd-web-dashboard.md` (staged)
-- **Learnings for future iterations:**
-  - `handle_auth_callback` uses injectable `_http_session_factory` kwarg for testing; production defaults to `aiohttp.ClientSession`
-  - Avoid `except aiohttp.web.HTTPException: raise` when using MagicMock stubs — use flag variables or restructure to avoid catching your own raises
-  - `@asynccontextmanager` + `yield` is more reliable for mocking `async with session.post(...) as resp:` than setting `__aenter__`/`__aexit__` on MagicMock
-  - All shared stubs (aiohttp, jwt) belong in `tests/conftest.py`; test files import from there
----
-
-## 2026-02-28 - US-004
-- Implemented YouTube search API endpoint (`GET /api/search?q={query}&limit={n}`)
-- Added `AudioResolver.search(query, max_results=5)` to `bot/audio/resolver.py` — uses `ytsearch{n}:` prefix with yt_dlp, returns list of dicts with title, url, duration, thumbnail
-- Created `bot/api/search.py` with `handle_search` and `setup_search_routes`; handler uses Music cog's `._resolver` if available, else creates fresh `AudioResolver()`
-- Updated `bot/api/server.py` to import and register search routes via `setup_search_routes(app)`
-- Added 7 tests in `tests/unit/test_resolver.py` for `AudioResolver.search()`; added 15 tests in `tests/test_search_api.py`; all 227 tests pass
-- Files changed: `bot/audio/resolver.py`, `bot/api/search.py` (new), `bot/api/server.py`, `tests/unit/test_resolver.py`, `tests/test_search_api.py` (new)
-- **Learnings for future iterations:**
-  - `handle_search` uses `_resolver_factory=None` kwarg for test injection; production uses Music cog resolver or creates fresh AudioResolver
-  - limit param is clamped to [1, 25] to prevent abuse; default is 5
-  - yt_dlp search returns `{"entries": [...]}` — search() handles None info and missing optional fields gracefully
----
-
-## 2026-02-28 - US-003
-- Implemented queue and playback API endpoints in `bot/api/player.py`
-- Routes: GET /api/queue, POST /api/queue/skip, POST /api/queue/clear, GET /api/playback, POST /api/playback/pause, POST /api/playback/resume, POST /api/playback/stop
-- Updated `bot/api/server.py` to accept `bot` param (stored as `app["bot"]`) and register player routes via `setup_player_routes(app)`
-- Updated `bot/__main__.py` to pass `bot=bot` to `create_app()`
-- Updated `tests/conftest.py`: added dict-style access to `FakeApplication` (`__setitem__`, `__getitem__`, `get`); added `FakeHTTPBadRequest` and `FakeHTTPServiceUnavailable` exception stubs; registered them in `mock_web`
-- Added `tests/test_player_api.py` with 30 tests; all 205 tests pass
-- Files changed: `bot/api/player.py` (new), `bot/api/server.py`, `bot/__main__.py`, `tests/conftest.py`, `tests/test_player_api.py` (new)
-- **Learnings for future iterations:**
-  - Bot is injected into the aiohttp app via `app["bot"] = bot`; handlers read it with `request.app.get("bot")` (returns None if not set)
-  - For "Music cog not available" guard, handlers raise `HTTPServiceUnavailable`; for bad input (missing guild_id, wrong state), raise `HTTPBadRequest`
-  - Skip delegates to `music._play_next(guild_id)` after `vm.stop()` — same logic as the Discord `/skip` command
-  - Stop calls `vm.stop()`, `queue.clear()`, sets `music._current_tracks[guild_id] = None`, then `await vm.leave()`
----
-
-## 2026-02-28 - US-005
-- Added `dashboard/` service to Docker Compose for full-stack deployment
-- Created `dashboard/Dockerfile` — nginx:alpine serving static files from `/usr/share/nginx/html`
-- Created `dashboard/nginx.conf` — listens on port 80; reverse-proxies `/api/` and `/auth/` to `bot:8080`; SPA fallback (`try_files`) for all other routes
-- Created `dashboard/index.html` — minimal placeholder (`<div id="root">`) until React app is scaffolded in US-006
-- Updated `docker-compose.yml`: `bot` service uses `expose: 8080` (internal); `dashboard` service builds from `./dashboard`, maps `3000:80`, `depends_on: bot`
-- Updated `.env.example` with: `API_PORT`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI`, `JWT_SECRET`
-- All 227 existing tests still pass
-- Files changed: `dashboard/Dockerfile` (new), `dashboard/nginx.conf` (new), `dashboard/index.html` (new), `docker-compose.yml`, `.env.example`
-- **Learnings for future iterations:**
-  - Docker Compose default network allows services to reach each other by service name (e.g., `http://bot:8080`)
-  - `expose:` in Compose makes the port available to sibling services only (not host); `ports:` maps to host
-  - US-006 should replace `dashboard/index.html` with the Vite React build output and update `dashboard/Dockerfile` to a multi-stage build
----
-
-## 2026-02-28 - US-006
-- Built Vite + React + TypeScript app skeleton in `dashboard/`
-- `src/api.ts`: `fetchMe()` (GET /auth/me), `logout()` (POST /auth/logout), `loginUrl(guildId?)`
-- `src/App.tsx`: auth state machine (loading → unauthenticated | authenticated); calls fetchMe on mount
-- `src/pages/LoginPage.tsx`: "Login with Discord" button → `/auth/discord`; shows error messages from `?error=` URL param
-- `src/pages/DashboardPage.tsx`: header with user avatar/username/logout; placeholder main area for US-007
-- Updated `dashboard/Dockerfile` to multi-stage: node:20-alpine builds `npm run build`, nginx:alpine serves `dist/`
-- Added `dashboard/.gitignore` to exclude `node_modules/` and `dist/`; package-lock.json committed
-- TypeScript build + all 227 Python tests pass
-- Files changed: `dashboard/Dockerfile`, `dashboard/index.html`, `dashboard/package.json`, `dashboard/package-lock.json`, `dashboard/.gitignore`, `dashboard/tsconfig*.json`, `dashboard/vite.config.ts`, `dashboard/src/` (all new)
-- **Learnings for future iterations:**
-  - `dashboard/src/vite-env.d.ts` with `/// <reference types="vite/client" />` is required for CSS imports to typecheck
-  - Auth flow: `fetchMe()` → 200 = logged in, 401 = not logged in; cookie is httponly so JS cannot read it directly
-  - Discord avatar URL: `https://cdn.discordapp.com/avatars/{id}/{avatar}.png`
-  - `tsconfig.app.json` has `noUnusedLocals: true` — be careful not to declare unused vars
----
-
-## 2026-02-28 - US-007
-- Built main dashboard queue view as `dashboard/src/components/QueueView.tsx`
-- Added `Track`, `QueueData` interfaces to `api.ts`; added `fetchQueue`, `skipTrack`, `clearQueue` API helpers
-- `QueueView` polls `GET /api/queue?guild_id=` every 5s; shows current track (with skip button) and upcoming queue (with clear button)
-- Updated `App.tsx` to pass `guildId` from `?guild=` URL param to `DashboardPage`
-- Updated `DashboardPage.tsx` to accept `guildId` prop and render `QueueView` (or no-guild message)
-- Files changed: `dashboard/src/api.ts`, `dashboard/src/App.tsx`, `dashboard/src/components/QueueView.tsx` (new), `dashboard/src/pages/DashboardPage.tsx`
-- **Learnings for future iterations:**
-  - guild_id flows: URL param `?guild=` → App.tsx → DashboardPage → QueueView (no backend change needed)
-  - `useCallback` wrapping the fetch function prevents stale closure issues in `setInterval` polling
-  - Track links open in new tab (`target="_blank"`) — add `rel="noreferrer"` for security
-  - `key` prop for queue items: use `${track.url}-${index}` since same URL can appear multiple times in queue
----
-
-## 2026-02-28 - US-008
-- Built YouTube search bar and add-to-queue flow
-- Added `POST /api/queue/add?guild_id=` endpoint to `bot/api/player.py`; reads JSON body `{url}`, resolves track via music cog's `_resolver`, adds to queue, starts playback if idle
-- Added `SearchResult` interface and `searchYouTube()` / `addToQueue()` helpers to `dashboard/src/api.ts`
-- Created `dashboard/src/components/SearchBar.tsx`: search form, results list with "+ Add" buttons, error/loading states
-- Added `refreshTrigger?: number` prop to `QueueView` — second `useEffect` calls `loadQueue()` when trigger changes (avoids remount flash vs using `key`)
-- Updated `DashboardPage.tsx`: added `queueRefreshKey` state, renders `<SearchBar onAdded={...} />` above `<QueueView refreshTrigger={...} />`
-- Added 8 tests for `handle_queue_add` in `tests/test_player_api.py`; all 235 Python tests pass; TypeScript build passes
-- Files changed: `bot/api/player.py`, `tests/test_player_api.py`, `dashboard/src/api.ts`, `dashboard/src/components/SearchBar.tsx` (new), `dashboard/src/components/QueueView.tsx`, `dashboard/src/pages/DashboardPage.tsx`
-- **Learnings for future iterations:**
-  - `request.json()` in aiohttp is async — use `AsyncMock(return_value=body)` to stub it in tests
-  - `_resolver_factory=None` injectable kwarg pattern used again for testable resolver in `handle_queue_add`
-  - `SearchResult` thumbnail field comes from yt_dlp `entry.get("thumbnail", "")` — may be empty string
-  - `refreshTrigger` prop on a component + `useEffect([refreshTrigger, stableFn])` is cleaner than `key` remount for triggering imperative reloads
----
-
-## 2026-02-28 - US-009
-- Built `PlaybackControls` component in `dashboard/src/components/PlaybackControls.tsx`
-- Added `PlaybackState` type and `fetchPlayback`, `pausePlayback`, `resumePlayback`, `stopPlayback` helpers to `dashboard/src/api.ts`
-- Component polls `GET /api/playback` every 5s; shows state badge (Playing/Paused/Stopped) and context-appropriate action buttons (Pause when playing, Resume when paused, Stop when active)
-- Updated `DashboardPage.tsx` to render `PlaybackControls` above `SearchBar` and `QueueView`; `onStopped` callback increments `queueRefreshKey` to refresh queue after stop
-- `refreshTrigger` prop reuses same pattern as `QueueView` for imperative reloads
-- TypeScript build passes; all 235 Python tests pass
-- Files changed: `dashboard/src/api.ts`, `dashboard/src/components/PlaybackControls.tsx` (new), `dashboard/src/pages/DashboardPage.tsx`
-- **Learnings for future iterations:**
-  - Status badge styling via per-state color maps (`badgeColors`, `badgeBorder`, `badgeText`) is clean; reuse this pattern for other state indicators
-  - `styles` object with function values (e.g. `statusBadge: (state) => ({...})`) works well when style depends on props
-  - `onStopped` callback pattern (alongside `refreshTrigger`) cleanly propagates side effects up the component tree
+  - The `on_track_end` callback is registered via `vm.set_on_track_end(self._make_on_track_end(guild_id))` only during the Discord `/play` command (when joining voice channel). API-triggered plays do NOT register the callback — so for API-only guilds, `on_track_end` may never fire, and the `_skipping` flag guard in the callback is never invoked.
+  - The `_skipping` reset after `_play_next` is a safety no-op in cases where the callback never fires (e.g., API-only flow).
+  - The pre-existing `auth.py` change (adding `@aiohttp.web.middleware`) required a conftest stub fix — always check for pre-existing working-tree modifications before starting.
 ---

@@ -6,7 +6,7 @@
       "id": "US-001",
       "title": "Fix double _play_next race condition in skip",
       "description": "Introduce a _skipping flag on the Music cog so skip operations call _play_next exactly once, keeping in-memory state consistent with what is actually playing.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "Add _skipping: dict[int, bool] attribute to Music cog",
         "_make_on_track_end callback skips scheduling _play_next when _skipping[guild_id] is True",

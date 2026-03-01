@@ -12,6 +12,41 @@
 Started: Sun Mar  1 08:33:41 PST 2026
 ---
 
+## 2026-03-01 - US-007
+- Auto-select guild when exactly 1 common guild; empty state message for 0 guilds
+- Files changed: `dashboard/src/pages/GuildPickerPage.tsx`
+- **Learnings for future iterations:**
+  - `handleGuildClick` must be defined before the `useEffect` that uses it (moved it up)
+  - Auto-redirect calls `window.location.href` — no need to setGuilds in that branch
+  - 0-guild empty state message should reference user membership, not just "bot not in any servers"
+---
+
+## 2026-03-01 - US-006
+- Added sessionStorage persistence for selected guild in `App.tsx`; clear on logout + navigate to '/'
+- Files changed: `dashboard/src/App.tsx`
+- **Learnings for future iterations:**
+  - `onLogout` in App.tsx was `setAuth({status: 'unauthenticated'})` — changed to clear sessionStorage + `window.location.href = '/'`
+  - sessionStorage helpers `getSessionGuild`/`setSessionGuild` are module-level functions (not inside component) to avoid recreating on render
+  - URL param takes precedence over sessionStorage; sessionStorage is read only when URL param is absent
+---
+
+## 2026-03-01 - US-005
+- Filtered /api/guilds to intersection of bot guilds and JWT guild_ids
+- Files changed: `bot/api/auth.py` (middleware stores jwt_payload on request), `bot/api/guilds.py` (filtering logic)
+- **Learnings for future iterations:**
+  - JWT middleware previously decoded the token but discarded the result — needed to add `request["jwt_payload"] = payload`
+  - In aiohttp, decoded payload is stored on `request` as a dict item (not an attribute), accessed via `request.get("jwt_payload", {})`
+  - Backward-compat: `user_guild_ids = jwt_payload.get("guild_ids")` returns None for old sessions → fall back to all bot guilds
+---
+
+## 2026-03-01 - US-004
+- Added guild_ids to JWT session payload
+- Files changed: `bot/api/auth.py`
+- **Learnings for future iterations:**
+  - `guilds_data` is already available in `handle_auth_callback` from Discord OAuth; no extra API call needed
+  - guild IDs are strings (Discord snowflakes) — `[g["id"] for g in guilds_data]`
+---
+
 ## 2026-03-01 - US-003
 - Verified QueueView skip behaviour — no code changes needed
 - `onQueueChanged` → increments `queueRefreshKey` → triggers `loadQueue()` (GET only) in QueueView; no double POST

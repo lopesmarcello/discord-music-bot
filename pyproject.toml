@@ -23,6 +23,9 @@ dev = [
     "ruff>=0.4",
 ]
 
+[tool.setuptools.packages.find]
+include = ["bot*"]
+
 [tool.ruff]
 line-length = 88
 

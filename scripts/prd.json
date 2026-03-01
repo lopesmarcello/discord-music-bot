@@ -46,7 +46,7 @@
       "id": "US-004",
       "title": "Set up global design tokens",
       "description": "As a developer, I need CSS custom properties (design tokens) defined globally so all components share the same colours and typography without inline duplication.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "index.css defines all tokens from the colour palette table as -- CSS variables on :root",
         "Global resets applied: box-sizing: border-box, margin: 0, font-family set to system stack",

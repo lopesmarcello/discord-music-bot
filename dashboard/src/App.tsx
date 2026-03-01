@@ -55,9 +55,8 @@ function LoadingScreen() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#1a1a2e',
-      color: 'rgba(255,255,255,0.5)',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      background: 'var(--bg-base)',
+      color: 'var(--text-muted)',
       fontSize: 16,
     }}>
       Loading…

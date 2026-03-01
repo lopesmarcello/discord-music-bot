@@ -9,6 +9,8 @@
 - JWT middleware auto-protects all routes not starting with /auth/; new API routes are auto-protected
 - TypeScript typecheck: cd /workspace/dashboard && npm run typecheck
 - New API modules follow pattern: handle_X_get() function + setup_X_routes(app) function
+- Design tokens defined in dashboard/src/index.css :root — use var(--token-name) in all components; token list: --bg-base, --bg-surface, --bg-elevated, --sidebar-bg, --player-bg, --border, --text-primary, --text-muted, --accent, --accent-hover
+- React inline styles can reference CSS variables: style={{ background: 'var(--bg-base)' }}
 
 # Ralph Progress Log
 Started: Sat Feb 28 16:27:50 PST 2026
@@ -55,4 +57,16 @@ Started: Sat Feb 28 16:27:50 PST 2026
   - Both the Discord cog commands AND the API handlers must update these timing dicts — the API handlers call vm methods directly, bypassing cog command methods
   - When API response shapes change (e.g. fetchPlayback now returns object not string), all TSX consumers must be updated too
   - `_make_music_cog()` in tests must explicitly initialise any dict attributes (`_started_at`, `_elapsed_offset`) the API handlers access; MagicMock auto-creates attributes that are un-serialisable
+---
+
+## 2026-02-28 - US-004
+- What was implemented: Defined CSS design tokens as custom properties on :root in index.css; applied global resets and body styles; updated LoadingScreen to use tokens
+- Files changed:
+  - dashboard/src/index.css: replaced bare reset with full token palette on :root, global resets (box-sizing, margin, font-family), body background/color using tokens
+  - dashboard/src/App.tsx: LoadingScreen now uses var(--bg-base) and var(--text-muted) instead of hardcoded hex values
+  - scripts/prd.json: marked US-004 passes: true
+- **Learnings for future iterations:**
+  - Token names: --bg-base, --bg-surface, --bg-elevated, --sidebar-bg, --player-bg, --border, --text-primary, --text-muted, --accent (#e8620a), --accent-hover (#d4580a)
+  - React inline styles accept CSS variable references as plain strings: style={{ color: 'var(--text-muted)' }}
+  - Since body sets background/color globally, components don't need to repeat these — only override when needed
 ---

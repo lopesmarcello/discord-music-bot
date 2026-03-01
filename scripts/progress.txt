@@ -148,3 +148,13 @@ Started: Sat Feb 28 16:27:50 PST 2026
   - `index !== undefined ? index : null` pattern used to hide the index column for now-playing row (which shows skip icon instead)
   - Error state is unified with loading state: initial render shows "Loading queue…"; if error occurs after load, errorBanner shows inline above the list
 ---
+
+## 2026-03-01 - US-011
+- What was implemented: Redesigned SearchBar component — full-width input with orange focus ring, accent-coloured search button, result rows with 48x48 thumbnails and per-row Add button with loading/added states
+- Files changed:
+  - dashboard/src/components/SearchBar.tsx: added ResultThumbnail sub-component with letter placeholder fallback; per-row `added` Set state with 2s timer for "Added ✓" confirmation; updated all styles to use design tokens; input focused state via onFocus/onBlur + style spread
+- **Learnings for future iterations:**
+  - Per-item "added" confirmation state uses a Set + setTimeout; timers stored in a useRef<Map> to avoid stale closures; React 18 doesn't warn about state updates on unmounted components so cleanup is optional
+  - Input focus ring achieved by tracking `focused` boolean in state and spreading `inputFocused` style (boxShadow + borderColor) onto the input — since inline styles can't use :focus pseudo-class
+  - `addButtonAdding` (filled while in-flight) and `addButtonAdded` (filled with opacity after) are distinct style objects spread over the base `addButton` style via `{...styles.addButton, ...(condition ? styles.variant : {})}`
+---

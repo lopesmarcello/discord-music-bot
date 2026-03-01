@@ -151,7 +151,7 @@
       "id": "US-011",
       "title": "Redesign SearchBar component",
       "description": "As a user, I want the search experience to look like a music app — full-width search input, results with thumbnails, and an Add button per result.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "Search input is full-width with rounded corners, var(--bg-elevated) background, orange focus ring",
         "Search button uses var(--accent) background",

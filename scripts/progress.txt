@@ -1,4 +1,5 @@
 ## Codebase Patterns
+- PlayerBar polls fetchPlayback + fetchQueue together via Promise.all every 5s; a separate setInterval ticks elapsedSeconds +1 per second when state is 'playing'
 - Python tests use stubs in tests/conftest.py (aiohttp.web, jwt) — never need real aiohttp/PyJWT in tests
 - pytest is not installed; use: PYTHONPATH=/tmp/pypackages:/workspace python3.11 -m pytest tests/ -v
   (first download pip: curl -sL https://bootstrap.pypa.io/pip/pip.pyz -o /tmp/pip.pyz && python3.11 /tmp/pip.pyz install pytest --target /tmp/pypackages)
@@ -121,4 +122,18 @@ Started: Sat Feb 28 16:27:50 PST 2026
   - localStorage collapse key: `sidebar_collapsed` — value is string `'true'` or `'false'`
   - SVG icons are defined as small local components (HomeIcon, SearchIcon, etc.) — no external icon library needed
   - `title` prop on NavItem button provides tooltip in collapsed mode for accessibility
+---
+
+## 2026-02-28 - US-009
+- What was implemented: Created PlayerBar fixed bottom component with thumbnail, track info, playback controls, and progress bar; wired into DashboardPage via AppShell playerBar slot
+- Files changed:
+  - dashboard/src/components/PlayerBar.tsx (new): full PlayerBar with left (thumbnail + title/source), centre (Play/Pause, Skip, Stop buttons), right (elapsed/duration progress bar); polls every 5s; ticks elapsed every 1s when playing
+  - dashboard/src/pages/DashboardPage.tsx: imports PlayerBar; passes it as playerBar prop to AppShell; wires onQueueChanged to increment queueRefreshKey
+  - scripts/prd.json: marked US-009 passes: true
+- **Learnings for future iterations:**
+  - PlayerBar uses two useEffects: one for 5s API polling (depends on fetchData callback), one for 1s elapsed tick (depends on playbackState); both return cleanup clearInterval
+  - `thumbnailUrl !== null` guard used (not just truthy) to satisfy TypeScript narrowing for the img src
+  - controlButtonStyle is a const CSSProperties object — button state dimming is achieved via opacity on the parent container (isStopped ? 0.4 : 1) rather than per-button disabled styles
+  - SVG icon components (PlayIcon, PauseIcon, SkipIcon, StopIcon) defined locally — no icon library needed
+  - PlayerBar onQueueChanged callback triggers queueRefreshKey increment in DashboardPage so QueueView refreshes after skip/stop from the bar
 ---

@@ -114,10 +114,10 @@ Two production regressions have returned on the VPS deployment:
 - If `guild_ids` is missing from the JWT (old session), fall back to returning all bot guilds (safe degradation).
 
 **Acceptance Criteria:**
-- [ ] `GET /api/guilds` returns only guilds present in both `bot.guilds` and the JWT `guild_ids`.
-- [ ] If `guild_ids` is absent in the JWT, all bot guilds are returned (backward-compat fallback).
-- [ ] A user who is NOT in guild X cannot see guild X in the picker.
-- [ ] Python linting passes (`ruff check`).
+- [x] `GET /api/guilds` returns only guilds present in both `bot.guilds` and the JWT `guild_ids`.
+- [x] If `guild_ids` is absent in the JWT, all bot guilds are returned (backward-compat fallback).
+- [x] A user who is NOT in guild X cannot see guild X in the picker.
+- [x] Python linting passes (`ruff check`).
 
 ---
 

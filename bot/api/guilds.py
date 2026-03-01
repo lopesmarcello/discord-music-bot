@@ -9,7 +9,12 @@ if TYPE_CHECKING:
 
 
 async def handle_guilds_get(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
-    """GET /api/guilds — return the list of guilds the bot is in."""
+    """GET /api/guilds — return guilds the bot and user share.
+
+    Filters bot.guilds to only those present in the JWT guild_ids claim.
+    If guild_ids is absent (old session), returns all bot guilds as a
+    backward-compatible fallback.
+    """
     import aiohttp.web  # noqa: PLC0415, F401
 
     bot = request.app.get("bot")
@@ -19,13 +24,22 @@ async def handle_guilds_get(request: "aiohttp.web.Request") -> "aiohttp.web.Resp
             content_type="application/json",
         )
 
+    jwt_payload = request.get("jwt_payload", {})
+    user_guild_ids = jwt_payload.get("guild_ids")
+
+    if user_guild_ids is not None:
+        user_guild_id_set = set(user_guild_ids)
+        bot_guilds = [g for g in bot.guilds if str(g.id) in user_guild_id_set]
+    else:
+        bot_guilds = list(bot.guilds)
+
     guilds = [
         {
             "id": str(guild.id),
             "name": guild.name,
             "icon": guild.icon,
         }
-        for guild in bot.guilds
+        for guild in bot_guilds
     ]
 
     return aiohttp.web.Response(

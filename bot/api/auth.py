@@ -216,10 +216,11 @@ def make_jwt_middleware():
             raise aiohttp.web.HTTPUnauthorized()
 
         try:
-            decode_jwt(token)
+            payload = decode_jwt(token)
         except Exception:  # noqa: BLE001
             raise aiohttp.web.HTTPUnauthorized()
 
+        request["jwt_payload"] = payload
         return await handler(request)
 
     return _jwt_middleware

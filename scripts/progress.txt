@@ -25,3 +25,17 @@ Started: Sat Feb 28 16:27:50 PST 2026
   - The mock_web.Response fake in conftest.py stores text as a string attribute; json.loads(resp.text) is the way to inspect responses
   - bot.guilds list has guild objects with .id (int), .name, .icon attributes; id must be str() in JSON
 ---
+
+## 2026-02-28 - US-002
+- What was implemented: Added `thumbnail: str` field to AudioTrack dataclass and surfaced it in all API responses
+- Files changed:
+  - bot/audio/resolver.py: added `thumbnail: str = ""` to AudioTrack dataclass; _make_track() now reads info.get("thumbnail", "")
+  - bot/api/player.py: _track_dict() now includes "thumbnail" key
+  - dashboard/src/api.ts: Track interface gains `thumbnail: string`
+  - tests/unit/test_resolver.py: updated _youtube_info() helper to include thumbnail; added 5 new tests
+  - tests/test_player_api.py: updated _make_track() helper to set track.thumbnail; fixed exact-equality assertion
+- **Learnings for future iterations:**
+  - AudioTrack dataclass uses default field values (thumbnail: str = "") — new optional fields can be added at end without breaking existing instantiations
+  - _make_track() in test_player_api.py uses MagicMock; any attribute accessed in _track_dict() must be explicitly set or it returns an un-serialisable MagicMock
+  - Exact dict equality assertions (assert data["x"] == {...}) must be updated when _track_dict() gains new keys
+---

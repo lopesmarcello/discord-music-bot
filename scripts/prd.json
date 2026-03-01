@@ -20,7 +20,7 @@
       "id": "US-002",
       "title": "Add thumbnail field to AudioTrack model and API responses",
       "description": "As a developer, I need the current-track data to include a thumbnail URL so the bottom player bar can display album art.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "AudioTrack dataclass gains field thumbnail: str (empty string when unavailable)",
         "_make_track in resolver.py populates thumbnail from yt-dlp info[\"thumbnail\"] (fallback \"\")",

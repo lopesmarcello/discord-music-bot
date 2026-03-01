@@ -110,6 +110,7 @@ mock_web.HTTPBadRequest = FakeHTTPBadRequest
 mock_web.HTTPServiceUnavailable = FakeHTTPServiceUnavailable
 mock_web.HTTPException = FakeHTTPException
 mock_web.Response = FakeResponse
+mock_web.middleware = lambda fn: fn  # pass-through: aiohttp.web.middleware is a no-op decorator
 
 mock_aiohttp = MagicMock()
 mock_aiohttp.web = mock_web

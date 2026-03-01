@@ -1,51 +1,33 @@
 {
-  "title": "Web Dashboard for Discord Music Bot",
-  "branchName": "main",
-  "stories": [
+  "title": "Fix Dashboard Reset to Empty State on Skip",
+  "branchName": "fix/dashboard-reset-on-skip",
+  "userStories": [
     {
       "id": "US-001",
-      "title": "Embed HTTP API server in the bot",
-      "passes": true
+      "title": "Fix double _play_next race condition in skip",
+      "description": "Introduce a _skipping flag on the Music cog so skip operations call _play_next exactly once, keeping in-memory state consistent with what is actually playing.",
+      "passes": false,
+      "acceptanceCriteria": [
+        "Add _skipping: dict[int, bool] attribute to Music cog",
+        "_make_on_track_end callback skips scheduling _play_next when _skipping[guild_id] is True",
+        "Discord /skip command sets _skipping flag before vm.stop()",
+        "player.py handle_queue_skip sets _skipping flag before vm.stop()",
+        "After skip, _current_tracks[guild_id] equals the track actually playing (or None if empty)",
+        "Queue reflects remaining tracks correctly after skip",
+        "Typecheck/lint passes"
+      ]
     },
     {
       "id": "US-002",
-      "title": "Implement Discord OAuth2 authentication in the API",
-      "passes": true
-    },
-    {
-      "id": "US-003",
-      "title": "Implement queue and playback API endpoints",
-      "passes": true
-    },
-    {
-      "id": "US-004",
-      "title": "Implement YouTube search API endpoint",
-      "passes": true
-    },
-    {
-      "id": "US-005",
-      "title": "Add dashboard service to Docker Compose",
-      "passes": true
-    },
-    {
-      "id": "US-006",
-      "title": "Build React app skeleton with login page",
-      "passes": true
-    },
-    {
-      "id": "US-007",
-      "title": "Build main dashboard queue view",
-      "passes": true
-    },
-    {
-      "id": "US-008",
-      "title": "Build YouTube search bar and add-to-queue flow",
-      "passes": true
-    },
-    {
-      "id": "US-009",
-      "title": "Build playback controls bar",
-      "passes": true
+      "title": "Verify dashboard stays in sync after skip",
+      "description": "As a user, the dashboard shows the correct now-playing song and queue immediately after skipping, whether triggered from Discord or the dashboard.",
+      "passes": false,
+      "acceptanceCriteria": [
+        "After dashboard skip: Now Playing updates to next song (or empty if none remain)",
+        "After Discord /skip: next 5-second poll reflects correct now-playing track",
+        "If queue has only one song when skip is triggered, dashboard shows empty queue and bot stops playback",
+        "Typecheck/lint passes"
+      ]
     }
   ]
 }

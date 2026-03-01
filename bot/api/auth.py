@@ -199,10 +199,10 @@ async def handle_auth_logout(request: "aiohttp.web.Request") -> "aiohttp.web.Res
 
 def make_jwt_middleware():
     """Return an aiohttp middleware that enforces JWT auth on non-/auth/* routes."""
+    import aiohttp.web  # noqa: PLC0415
 
+    @aiohttp.web.middleware
     async def _jwt_middleware(request, handler):
-        import aiohttp.web  # noqa: PLC0415
-
         if request.path.startswith("/auth/"):
             return await handler(request)
 

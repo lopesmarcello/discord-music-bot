@@ -78,8 +78,10 @@ async def handle_queue_skip(request: "aiohttp.web.Request") -> "aiohttp.web.Resp
     if not vm.is_playing() and not vm.is_paused():
         raise aiohttp.web.HTTPBadRequest(reason="Nothing is currently playing")
 
+    music._skipping[guild_id] = True
     vm.stop()
     await music._play_next(guild_id)
+    music._skipping[guild_id] = False
 
     current = music._current_tracks.get(guild_id)
     return aiohttp.web.Response(

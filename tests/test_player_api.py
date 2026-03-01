@@ -284,6 +284,37 @@ class TestHandleQueueSkip:
         assert data["skipped"] is True
         assert data["current"] is None
 
+    def test_skip_sets_skipping_flag_before_stop(self):
+        """handle_queue_skip must set _skipping[guild_id] = True before vm.stop()."""
+        from bot.api.player import handle_queue_skip
+
+        flag_at_stop_time = {}
+
+        vm = _make_vm(is_playing=True)
+
+        def capture_flag_on_stop():
+            flag_at_stop_time["value"] = cog._skipping.get(123, False)
+
+        vm.stop.side_effect = capture_flag_on_stop
+        cog, _, q = _make_music_cog(vm=vm)
+        cog._skipping = {}
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        asyncio.run(handle_queue_skip(request))
+        assert flag_at_stop_time.get("value") is True, "_skipping must be True when vm.stop() is called"
+
+    def test_skip_clears_skipping_flag_after_play_next(self):
+        """handle_queue_skip must clear _skipping[guild_id] after _play_next completes."""
+        from bot.api.player import handle_queue_skip
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        cog._skipping = {}
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        asyncio.run(handle_queue_skip(request))
+        assert cog._skipping.get(123, False) is False, "_skipping must be False after skip completes"
+
 
 # ---------------------------------------------------------------------------
 # POST /api/queue/clear

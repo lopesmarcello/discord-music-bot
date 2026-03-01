@@ -35,6 +35,7 @@ class Music(commands.Cog):
             voice_managers if voice_managers is not None else {}
         )
         self._current_tracks: dict[int, object] = {}
+        self._skipping: dict[int, bool] = {}
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -51,6 +52,9 @@ class Music(commands.Cog):
     def _make_on_track_end(self, guild_id: int):
         """Return a callback that advances the queue when a track finishes."""
         def callback(error: Optional[Exception]) -> None:  # pragma: no cover
+            if self._skipping.get(guild_id, False):
+                self._skipping[guild_id] = False
+                return
             loop = self.bot.loop
             if loop and not loop.is_closed():
                 asyncio.run_coroutine_threadsafe(self._play_next(guild_id), loop)
@@ -130,10 +134,12 @@ class Music(commands.Cog):
         if not vm.is_playing() and not vm.is_paused():
             await ctx.send("Nothing to skip.")
             return
+        self._skipping[ctx.guild.id] = True
         vm.stop()
         queue = self._queue_registry.get_queue(ctx.guild.id)
         next_track = queue.peek()
         await self._play_next(ctx.guild.id)
+        self._skipping[ctx.guild.id] = False
         if next_track is not None:
             await ctx.send(f"Skipped. Now playing: **{next_track.title}**")
         else:

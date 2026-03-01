@@ -149,3 +149,45 @@ class TestSkipCommand:
         ctx = _make_ctx()
         asyncio.run(cog.skip(ctx))
         assert ctx.send.call_count == 1
+
+    def test_skip_sets_and_clears_skipping_flag(self):
+        """_skipping flag must be False after skip completes."""
+        vc = _make_vc(playing=True)
+        registry = GuildQueueRegistry()
+        queue = registry.get_queue(GUILD_ID)
+        queue.add(_make_track())
+        cog, vm = _make_cog_with_vm(vc, registry)
+        ctx = _make_ctx()
+        asyncio.run(cog.skip(ctx))
+        assert cog._skipping.get(GUILD_ID, False) is False
+
+    def test_skipping_flag_initialized_empty(self):
+        """_skipping dict starts empty."""
+        bot = MagicMock()
+        bot.loop = asyncio.new_event_loop()
+        cog = Music(bot)
+        assert cog._skipping == {}
+
+    def test_on_track_end_skips_play_next_when_skipping_flag_set(self):
+        """_make_on_track_end callback does NOT schedule _play_next when _skipping is True."""
+        bot = MagicMock()
+        bot.loop = asyncio.new_event_loop()
+        cog = Music(bot)
+        cog._skipping[GUILD_ID] = True
+        scheduled_coroutines = []
+
+        import asyncio as _asyncio
+        original = _asyncio.run_coroutine_threadsafe
+
+        def capture(coro, loop):
+            scheduled_coroutines.append(coro)
+            return MagicMock()
+
+        callback = cog._make_on_track_end(GUILD_ID)
+        # Patch run_coroutine_threadsafe to detect scheduling
+        import unittest.mock as mock
+        with mock.patch("asyncio.run_coroutine_threadsafe", side_effect=capture):
+            callback(None)
+
+        assert len(scheduled_coroutines) == 0, "_play_next must NOT be scheduled during skip"
+        assert cog._skipping.get(GUILD_ID, True) is False, "flag must be cleared"

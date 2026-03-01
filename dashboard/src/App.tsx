@@ -3,6 +3,7 @@ import type { User } from './api';
 import { fetchMe } from './api';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import GuildPickerPage from './pages/GuildPickerPage';
 
 type AuthState =
   | { status: 'loading' }
@@ -39,11 +40,17 @@ export default function App() {
   }
 
   const guildId = getQueryParam('guild');
+  const onLogout = () => setAuth({ status: 'unauthenticated' });
+
+  if (guildId === undefined) {
+    return <GuildPickerPage user={auth.user} onLogout={onLogout} />;
+  }
+
   return (
     <DashboardPage
       user={auth.user}
       guildId={guildId}
-      onLogout={() => setAuth({ status: 'unauthenticated' })}
+      onLogout={onLogout}
     />
   );
 }

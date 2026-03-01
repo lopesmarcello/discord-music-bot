@@ -56,7 +56,9 @@ class AudioResolver:
     def __init__(self, ytdl_class=None, _http_get_fn=None) -> None:
         self._ytdl_class = ytdl_class
         # Injectable for testing; defaults to urllib.request.urlopen
-        self._http_get_fn = _http_get_fn if _http_get_fn is not None else urllib.request.urlopen
+        self._http_get_fn = (
+            _http_get_fn if _http_get_fn is not None else urllib.request.urlopen
+        )
 
     # ------------------------------------------------------------------
     # Dependency accessors (lazy-import for production; injectable for tests)
@@ -185,7 +187,10 @@ class AudioResolver:
             try:
                 return self._search_youtube_api(query, max_results, api_key)
             except Exception as exc:
-                _log.warning("YouTube API search failed, falling back to SoundCloud: %s", exc)
+                _log.warning(
+                    "YouTube API search failed, falling back to SoundCloud: %s",
+                    exc,
+                )
         return self._search_ytdlp_scsearch(query, max_results)
 
     def resolve(self, query: str) -> AudioTrack:

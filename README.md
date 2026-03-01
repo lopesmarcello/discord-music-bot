@@ -119,6 +119,16 @@ pytest tests/unit/
 pytest tests/integration/
 ```
 
+## Linting
+
+```bash
+# Check bot code for style and error violations
+ruff check bot/
+
+# Auto-fix safe violations
+ruff check --fix bot/
+```
+
 ## Docker Deployment
 
 ### Prerequisites

@@ -76,7 +76,11 @@ async def _fetch_discord_oauth_data(
     """
     import aiohttp  # noqa: PLC0415
 
-    _factory = http_session_factory if http_session_factory is not None else aiohttp.ClientSession
+    _factory = (
+        http_session_factory
+        if http_session_factory is not None
+        else aiohttp.ClientSession
+    )
 
     try:
         async with _factory() as session:

@@ -156,6 +156,7 @@ async def handle_auth_callback(
         "username": user_data["username"],
         "avatar": user_data.get("avatar"),
         "guild_id": guild_id,
+        "guild_ids": [g["id"] for g in guilds_data],
     }
     token = encode_jwt(session_payload)
 

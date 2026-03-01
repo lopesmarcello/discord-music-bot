@@ -93,9 +93,9 @@ Two production regressions have returned on the VPS deployment:
 - This stores the full list of user guild IDs in the JWT cookie (they are Discord snowflake strings, a typical user is in 10–100 guilds — well within JWT limits).
 
 **Acceptance Criteria:**
-- [ ] `session_payload` in `handle_auth_callback` includes a `guild_ids` key containing a list of guild ID strings.
-- [ ] The JWT is re-issued with this new field on every fresh login (existing sessions without `guild_ids` will just show all guilds until they re-login — acceptable).
-- [ ] Python typechecks / linting passes (`ruff check`).
+- [x] `session_payload` in `handle_auth_callback` includes a `guild_ids` key containing a list of guild ID strings.
+- [x] The JWT is re-issued with this new field on every fresh login (existing sessions without `guild_ids` will just show all guilds until they re-login — acceptable).
+- [x] Python typechecks / linting passes (`ruff check`).
 
 ---
 

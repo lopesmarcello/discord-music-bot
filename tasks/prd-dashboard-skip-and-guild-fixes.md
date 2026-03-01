@@ -137,10 +137,10 @@ Two production regressions have returned on the VPS deployment:
 - In `GuildPickerPage.handleGuildClick`, the navigation is `window.location.href = '/?guild=...'` which already puts the guild in URL — sessionStorage is updated on the next load. No change needed in GuildPickerPage.
 
 **Acceptance Criteria:**
-- [ ] After navigating to `/?guild=123`, refreshing the page still shows the dashboard for guild 123 (no redirect to picker).
-- [ ] Opening a new tab does NOT inherit the guild (sessionStorage is tab-scoped).
-- [ ] Logging out clears the session guild (`sessionStorage.removeItem('selected_guild')` in the logout handler).
-- [ ] TypeScript typechecks pass.
+- [x] After navigating to `/?guild=123`, refreshing the page still shows the dashboard for guild 123 (no redirect to picker).
+- [x] Opening a new tab does NOT inherit the guild (sessionStorage is tab-scoped).
+- [x] Logging out clears the session guild (`sessionStorage.removeItem('selected_guild')` in the logout handler).
+- [x] TypeScript typechecks pass.
 
 ---
 

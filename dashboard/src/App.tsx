@@ -10,8 +10,18 @@ type AuthState =
   | { status: 'unauthenticated' }
   | { status: 'authenticated'; user: User };
 
+const SESSION_GUILD_KEY = 'selected_guild';
+
 function getQueryParam(name: string): string | undefined {
   return new URLSearchParams(window.location.search).get(name) ?? undefined;
+}
+
+function getSessionGuild(): string | undefined {
+  return sessionStorage.getItem(SESSION_GUILD_KEY) ?? undefined;
+}
+
+function setSessionGuild(id: string): void {
+  sessionStorage.setItem(SESSION_GUILD_KEY, id);
 }
 
 export default function App() {
@@ -39,8 +49,22 @@ export default function App() {
     return <LoginPage guildId={guildId} error={error} />;
   }
 
-  const guildId = getQueryParam('guild');
-  const onLogout = () => setAuth({ status: 'unauthenticated' });
+  // Persist guild selection in sessionStorage so refresh doesn't send the
+  // user back to the picker.  URL param takes precedence; sessionStorage is
+  // used as a fallback when the param is absent.
+  const urlGuildId = getQueryParam('guild');
+  let guildId: string | undefined;
+  if (urlGuildId !== undefined) {
+    setSessionGuild(urlGuildId);
+    guildId = urlGuildId;
+  } else {
+    guildId = getSessionGuild();
+  }
+
+  const onLogout = () => {
+    sessionStorage.removeItem(SESSION_GUILD_KEY);
+    window.location.href = '/';
+  };
 
   if (guildId === undefined) {
     return <GuildPickerPage user={auth.user} onLogout={onLogout} />;

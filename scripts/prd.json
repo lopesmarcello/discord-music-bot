@@ -75,7 +75,7 @@
       "id": "US-006",
       "title": "Update App.tsx routing for guild picker flow",
       "description": "As a user, I want the app to automatically route me to the guild picker when I'm logged in but haven't selected a guild, so I never see an error screen.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "When auth.status === 'authenticated' and guildId is undefined, render <GuildPickerPage> instead of the old 'no guild' state",
         "When auth.status === 'authenticated' and guildId is defined, render <DashboardPage> (existing behaviour)",

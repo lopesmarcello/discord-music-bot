@@ -71,6 +71,16 @@ Started: Sat Feb 28 16:27:50 PST 2026
   - Since body sets background/color globally, components don't need to repeat these — only override when needed
 ---
 
+## 2026-02-28 - US-006
+- What was implemented: Updated App.tsx to route authenticated users without a guild to GuildPickerPage instead of DashboardPage with "no guild" state
+- Files changed:
+  - dashboard/src/App.tsx: imported GuildPickerPage; added conditional branch — if guildId is undefined, render GuildPickerPage; otherwise render DashboardPage with the defined guildId
+- **Learnings for future iterations:**
+  - GuildPickerPage already accepted user and onLogout props, so no changes to GuildPickerPage were needed
+  - The routing logic uses `guildId === undefined` (not a falsy check) to correctly narrow the type for DashboardPage's guildId prop
+  - After this change, DashboardPage is never rendered with guildId=undefined; the "no guild" fallback in DashboardPage is now dead code (but left in place to avoid scope creep)
+---
+
 ## 2026-02-28 - US-005
 - What was implemented: Created GuildPickerPage component that fetches and displays a grid of guild cards
 - Files changed:

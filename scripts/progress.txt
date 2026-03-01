@@ -70,3 +70,14 @@ Started: Sat Feb 28 16:27:50 PST 2026
   - React inline styles accept CSS variable references as plain strings: style={{ color: 'var(--text-muted)' }}
   - Since body sets background/color globally, components don't need to repeat these — only override when needed
 ---
+
+## 2026-02-28 - US-005
+- What was implemented: Created GuildPickerPage component that fetches and displays a grid of guild cards
+- Files changed:
+  - dashboard/src/pages/GuildPickerPage.tsx (new): full GuildPickerPage with loading skeleton, empty state, error state, guild card grid, and GuildCard sub-component with hover accent
+- **Learnings for future iterations:**
+  - TypeScript ternary chains don't narrow union types — use explicit `=== null` checks instead of negation (`!guilds`) to ensure narrowing works in nested branches
+  - Guild icon CDN URL pattern: `https://cdn.discordapp.com/icons/{guild.id}/{guild.icon}.png?size=64`
+  - Navigation to guild: `window.location.href = '/?guild=...'` (not React Router, just direct URL change since guild selection changes the entire app state)
+  - Loading skeleton uses same card dimensions as real cards but with opacity: 0.5 for the shimmer effect
+---

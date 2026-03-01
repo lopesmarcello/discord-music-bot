@@ -59,7 +59,7 @@
       "id": "US-005",
       "title": "Build GuildPickerPage component",
       "description": "As an authenticated user, I want to see a list of servers the bot is in when I open the dashboard without a guild link, so I can pick where to go.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "src/pages/GuildPickerPage.tsx created",
         "Calls fetchGuilds() on mount; shows a loading skeleton while fetching",

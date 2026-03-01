@@ -38,3 +38,17 @@
   - `appleboy/ssh-action@v1` is the SSH deploy action; secrets pattern: `DEV_*` for dev, `PROD_*` for prod
   - `environment: development` / `environment: production` references GitHub Environments for secrets scoping and deployment tracking
 ---
+
+## 2026-03-01 - US-004
+- What was implemented: Created `.github/workflows/deploy-prod.yml` for production CD on push to main
+  - Reuses same `test-bot` (Python 3.11) and `lint-dashboard` (Node.js 20) CI jobs
+  - `deploy` job runs after both CI jobs pass (`needs: [test-bot, lint-dashboard]`)
+  - Uses `environment: production` GitHub Environment
+  - SSH deploy via `appleboy/ssh-action@v1` using `PROD_HOST`, `PROD_USER`, `PROD_SSH_KEY`, `PROD_DEPLOY_PATH` secrets
+  - Deploy script: `docker compose pull && docker compose up -d --build`
+  - Triggers on `push` to `main`
+- Files changed: `.github/workflows/deploy-prod.yml`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Production workflow mirrors dev workflow exactly; only differences: trigger branch (`main` vs `develop`), environment name (`production` vs `development`), secrets prefix (`PROD_*` vs `DEV_*`)
+  - Both CI jobs must be included in the deploy workflow since GitHub Actions doesn't support cross-workflow job dependencies natively
+---

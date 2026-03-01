@@ -53,7 +53,7 @@
       "title": "Create main branch production CD workflow",
       "description": "As a maintainer, I want production to automatically deploy when main is updated so that stable releases reach users without manual steps.",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "File created at .github/workflows/deploy-prod.yml",
         "Workflow triggers on push to main",

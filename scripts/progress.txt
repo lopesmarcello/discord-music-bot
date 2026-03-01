@@ -1,3 +1,23 @@
+## Codebase Patterns
+- TypeScript typecheck: `cd dashboard && npm run typecheck` (tsc -b --noEmit)
+- Python lint: `ruff check bot/` (not installed in local env; runs in CI only)
+- Python tests: `pytest --tb=short` (not installed in local env; runs in CI only)
+- PRD is a markdown file at `tasks/prd-dashboard-skip-and-guild-fixes.md` (not prd.json)
+- Mark story done by checking `[ ]` → `[x]` in the markdown PRD
+- JWT middleware (`make_jwt_middleware` in `bot/api/auth.py`) decodes the token but does NOT store it on `request` — handlers must decode it themselves if they need payload
+- `skipTrack()` in `api.ts` already returns `QueueData` (`{current, tracks}`) — backend change not needed for US-002
+
+---
 # Ralph Progress Log
 Started: Sun Mar  1 08:33:41 PST 2026
+---
+
+## 2026-03-01 - US-001
+- Investigated and documented the skip-clearing race condition
+- Files changed: `dashboard/src/components/PlayerBar.tsx` (added race condition comment), `tasks/prd-dashboard-skip-and-guild-fixes.md` (checked off acceptance criteria)
+- **Learnings for future iterations:**
+  - `PlayerBar.handleSkip` discards `skipTrack()` return value and immediately calls `fetchData()` — this is the bug
+  - `bot/api/player.py:handle_queue_skip` awaits `_play_next` before responding, but the Discord VC may still report `is_playing()=False` briefly after `_play_next` returns (async audio setup race)
+  - `QueueView.handleSkip` already does the correct thing: uses skip response directly, no re-fetch
+  - `skipTrack()` in `api.ts` already returns `{current, tracks}` — no backend changes needed for US-002
 ---

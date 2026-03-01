@@ -49,12 +49,12 @@ Two production regressions have returned on the VPS deployment:
 - `skipTrack()` in `api.ts` already returns `{ current, tracks }` — no backend change needed.
 
 **Acceptance Criteria:**
-- [ ] `PlayerBar.handleSkip` reads the return value of `skipTrack(guildId)` and calls `setCurrentTrack(updated.current)`.
-- [ ] `PlayerBar.handleSkip` does NOT call `fetchData()` immediately after the skip.
-- [ ] `onQueueChanged?.()` is still called so `QueueView` refreshes.
-- [ ] Skipping from the PlayerBar does not clear the "now playing" display or show "Nothing playing" transiently.
-- [ ] Skipping from QueueView (unchanged) still works correctly.
-- [ ] TypeScript typechecks pass (`npm run typecheck` or `tsc --noEmit`).
+- [x] `PlayerBar.handleSkip` reads the return value of `skipTrack(guildId)` and calls `setCurrentTrack(updated.current)`.
+- [x] `PlayerBar.handleSkip` does NOT call `fetchData()` immediately after the skip.
+- [x] `onQueueChanged?.()` is still called so `QueueView` refreshes.
+- [x] Skipping from the PlayerBar does not clear the "now playing" display or show "Nothing playing" transiently.
+- [x] Skipping from QueueView (unchanged) still works correctly.
+- [x] TypeScript typechecks pass (`npm run typecheck` or `tsc --noEmit`).
 
 ---
 

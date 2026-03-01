@@ -53,16 +53,15 @@ export default function PlayerBar({ guildId, onQueueChanged }: PlayerBarProps) {
     }
   }
 
-  // Race condition (US-001): skipTrack() awaits _play_next on the backend, but the
-  // Discord voice client may not report is_playing() immediately after _play_next
-  // returns.  Calling fetchData() right here fires fetchPlayback + fetchQueue while
-  // the backend is still in a transient "stopped" state, causing a blank-flash.
-  // Fix (US-002): use the skip response directly instead of re-fetching.
   async function handleSkip() {
     setBusy(true);
     try {
-      await skipTrack(guildId);
-      fetchData();
+      // Use the skip response to update state immediately (US-002).
+      // Do NOT call fetchData() here — it races with the backend's transient
+      // stopped state while _play_next resolves the next audio stream.
+      // The 5-second poll will correct any remaining drift.
+      const updated = await skipTrack(guildId);
+      setCurrentTrack(updated.current);
       onQueueChanged?.();
     } catch { /* ignore */ } finally {
       setBusy(false);

@@ -131,7 +131,7 @@ Copy this checklist into your PR description and check off each item before requ
 
 ## CI Requirements
 
-Every PR to `develop` runs the following checks automatically via the [`ci.yml`](.github/workflows/ci.yml) workflow. **All must pass before your PR can be merged:**
+Every PR to `develop` or `main` runs the following checks automatically via the [`ci.yml`](.github/workflows/ci.yml) workflow. **All must pass before your PR can be merged:**
 
 | Check | Command | What it validates |
 | --- | --- | --- |
@@ -173,7 +173,7 @@ The branch strategy keeps `develop` as the integration branch and `main` as the 
 **Promotion process:**
 
 1. Ensure `develop` is green — CI must be passing.
-2. Verify the dev environment (deployed automatically on every `develop` push) looks correct.
+2. Verify the dev environment looks correct (deploy it manually if needed — see below).
 3. Open a **PR from `develop` to `main`** with a summary of what's being promoted:
    ```
    Title: chore: promote develop → main (YYYY-MM-DD)
@@ -181,17 +181,17 @@ The branch strategy keeps `develop` as the integration branch and `main` as the 
    ```
 4. Get at least one other team member to review the promotion PR.
 5. **Merge** (do not squash — preserve the individual commits for history).
-6. The [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) workflow triggers automatically on the `main` push, runs CI, and deploys to the production server.
-7. Monitor the GitHub Actions run and confirm the production deploy step completes successfully.
+6. Trigger the production deploy manually: go to **GitHub → Actions → Deploy to Production → Run workflow**.
+7. Monitor the run and confirm the deploy step completes successfully.
 
-**Rollback:** If production is broken after a promotion, revert the merge commit on `main`:
+**Rollback:** If production is broken after a promotion, revert the merge commit on `main` and trigger a new manual deploy:
 
 ```bash
 git revert -m 1 <merge-commit-sha>
 git push origin main
 ```
 
-This triggers a new production deploy with the reverted code.
+Then re-run the [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) workflow manually from the Actions tab.
 
 ---
 
@@ -199,7 +199,7 @@ This triggers a new production deploy with the reverted code.
 
 > This section applies to team members who manage deployment infrastructure.
 
-The deploy workflows use `appleboy/ssh-action` to connect to servers over SSH and run `docker compose` commands. Two sets of secrets are required — one per environment.
+The deploy workflows are triggered manually from the **GitHub Actions** tab. They use `appleboy/ssh-action` to connect to servers over SSH and run `docker compose` commands. Two sets of secrets are required — one per environment.
 
 ### Development environment secrets
 
@@ -229,7 +229,7 @@ Each server also needs a `.env` file in the deploy path with all required variab
 
 ### Branch protection
 
-To enforce CI checks on `develop`, enable branch protection in **GitHub → Settings → Branches → develop**:
+To enforce CI checks on `develop` and `main`, enable branch protection in **GitHub → Settings → Branches** for each branch:
 
 - Check **Require status checks to pass before merging**
 - Add `Test Bot (Python 3.11)` and `Lint Dashboard (Node.js 20)` as required status checks

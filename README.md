@@ -1,8 +1,6 @@
 # Discord Music Bot
 
 [![CI](https://github.com/lopesmarcello/discord-music-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/lopesmarcello/discord-music-bot/actions/workflows/ci.yml)
-[![Deploy Dev](https://github.com/lopesmarcello/discord-music-bot/actions/workflows/deploy-dev.yml/badge.svg)](https://github.com/lopesmarcello/discord-music-bot/actions/workflows/deploy-dev.yml)
-[![Deploy Prod](https://github.com/lopesmarcello/discord-music-bot/actions/workflows/deploy-prod.yml/badge.svg)](https://github.com/lopesmarcello/discord-music-bot/actions/workflows/deploy-prod.yml)
 
 A self-hosted Discord music bot written in Python that streams audio from YouTube and SoundCloud into voice channels. Supports slash commands (`/play`) and prefix commands (`!play`), and ships with a browser-based web dashboard for queue management and playback control.
 
@@ -295,11 +293,11 @@ docker compose up -d --build
 
 | Workflow | File | Trigger | Jobs |
 | --- | --- | --- | --- |
-| PR Validation | [`ci.yml`](.github/workflows/ci.yml) | PR → `develop` | `test-bot` (pytest + ruff), `lint-dashboard` (typecheck) |
-| Deploy Dev | [`deploy-dev.yml`](.github/workflows/deploy-dev.yml) | Push → `develop` | CI checks → SSH deploy to dev server |
-| Deploy Prod | [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) | Push → `main` | CI checks → SSH deploy to prod server |
+| PR Validation | [`ci.yml`](.github/workflows/ci.yml) | PR → `develop` or `main` | `test-bot` (pytest + ruff), `lint-dashboard` (typecheck) |
+| Deploy Dev | [`deploy-dev.yml`](.github/workflows/deploy-dev.yml) | Manual (`workflow_dispatch`) | SSH deploy to dev server |
+| Deploy Prod | [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) | Manual (`workflow_dispatch`) | SSH deploy to prod server |
 
-Deployments use `appleboy/ssh-action` and run `docker compose pull && docker compose up -d --build` on the target server. Required GitHub Actions secrets:
+Deployments are triggered manually from the **GitHub Actions** tab. They use `appleboy/ssh-action` and run `docker compose pull && docker compose up -d --build` on the target server. Required GitHub Actions secrets:
 
 | Secret | Used by |
 | --- | --- |
@@ -370,4 +368,4 @@ discord-music-bot/
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution guide, branch naming conventions, PR checklist, and deployment secret setup instructions.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution guide, branch naming conventions, PR checklist, and manual deployment instructions.

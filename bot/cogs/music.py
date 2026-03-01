@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import TYPE_CHECKING, Optional
 
 import discord
@@ -36,6 +37,8 @@ class Music(commands.Cog):
         )
         self._current_tracks: dict[int, object] = {}
         self._skipping: dict[int, bool] = {}
+        self._started_at: dict[int, float | None] = {}
+        self._elapsed_offset: dict[int, float] = {}
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -66,8 +69,11 @@ class Music(commands.Cog):
         track = queue.next()
         if track is None:
             self._current_tracks[guild_id] = None
+            self._started_at[guild_id] = None
             return
         self._current_tracks[guild_id] = track
+        self._started_at[guild_id] = time.time()
+        self._elapsed_offset[guild_id] = 0.0
         vm = self._get_voice_manager(guild_id)
         await vm.play(track.stream_url)
 
@@ -114,6 +120,10 @@ class Music(commands.Cog):
         if not vm.is_playing():
             await ctx.send("Nothing is currently playing.")
             return
+        started_at = self._started_at.get(ctx.guild.id)
+        if started_at is not None:
+            self._elapsed_offset[ctx.guild.id] = self._elapsed_offset.get(ctx.guild.id, 0.0) + (time.time() - started_at)
+            self._started_at[ctx.guild.id] = None
         vm.pause()
         await ctx.send("Paused.")
 
@@ -125,6 +135,7 @@ class Music(commands.Cog):
             await ctx.send("Playback is not paused.")
             return
         vm.resume()
+        self._started_at[ctx.guild.id] = time.time()
         await ctx.send("Resumed.")
 
     @commands.hybrid_command(name="skip", description="Skip the current song")
@@ -153,6 +164,8 @@ class Music(commands.Cog):
             await ctx.send("I'm not in a voice channel.")
             return
         vm.stop()
+        self._started_at[ctx.guild.id] = None
+        self._elapsed_offset[ctx.guild.id] = 0.0
         queue = self._queue_registry.get_queue(ctx.guild.id)
         queue.clear()
         self._current_tracks[ctx.guild.id] = None

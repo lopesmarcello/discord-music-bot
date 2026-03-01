@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import time
 from unittest.mock import AsyncMock, MagicMock
 
 # Shared stubs already injected via tests/conftest.py (aiohttp, jwt).
@@ -66,6 +67,8 @@ def _make_music_cog(
 ):
     cog = MagicMock()
     cog._current_tracks = {}
+    cog._started_at = {}
+    cog._elapsed_offset = {}
     if current_track is not None:
         cog._current_tracks[guild_id] = current_track
 
@@ -599,29 +602,63 @@ class TestHandlePlaybackGet:
         request = _make_request(guild_id=123)
         resp = asyncio.run(handle_playback_get(request))
         data = json.loads(resp.text)
-        assert data == {"state": "stopped"}
+        assert data["state"] == "stopped"
+        assert data["elapsed_seconds"] is None
 
     def test_returns_playing_state(self):
         from bot.api.player import handle_playback_get
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
+        cog._started_at[123] = time.time()
+        cog._elapsed_offset[123] = 0.0
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_get(request))
         data = json.loads(resp.text)
-        assert data == {"state": "playing"}
+        assert data["state"] == "playing"
+        assert isinstance(data["elapsed_seconds"], float)
+        assert data["elapsed_seconds"] >= 0.0
+
+    def test_returns_playing_state_with_offset(self):
+        from bot.api.player import handle_playback_get
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        cog._started_at[123] = time.time()
+        cog._elapsed_offset[123] = 30.0
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_playback_get(request))
+        data = json.loads(resp.text)
+        assert data["state"] == "playing"
+        assert data["elapsed_seconds"] >= 30.0
+
+    def test_returns_playing_state_no_started_at(self):
+        from bot.api.player import handle_playback_get
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        # _started_at not set for this guild — falls back to None
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_playback_get(request))
+        data = json.loads(resp.text)
+        assert data["state"] == "playing"
+        assert data["elapsed_seconds"] is None
 
     def test_returns_paused_state(self):
         from bot.api.player import handle_playback_get
 
         vm = _make_vm(is_playing=False, is_paused=True)
         cog, _, q = _make_music_cog(vm=vm)
+        cog._elapsed_offset[123] = 45.5
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_get(request))
         data = json.loads(resp.text)
-        assert data == {"state": "paused"}
+        assert data["state"] == "paused"
+        assert data["elapsed_seconds"] == 45.5
 
     def test_returns_stopped_state(self):
         from bot.api.player import handle_playback_get
@@ -632,7 +669,8 @@ class TestHandlePlaybackGet:
         request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_get(request))
         data = json.loads(resp.text)
-        assert data == {"state": "stopped"}
+        assert data["state"] == "stopped"
+        assert data["elapsed_seconds"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -652,6 +690,33 @@ class TestHandlePlaybackPause:
         data = json.loads(resp.text)
         assert data == {"paused": True}
         vm.pause.assert_called_once()
+
+    def test_pause_freezes_elapsed_time(self):
+        from bot.api.player import handle_playback_pause
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        cog._started_at[123] = time.time() - 10.0  # 10 seconds into track
+        cog._elapsed_offset[123] = 0.0
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        asyncio.run(handle_playback_pause(request))
+        # started_at should be cleared and offset should be ~10s
+        assert cog._started_at.get(123) is None
+        assert cog._elapsed_offset.get(123, 0.0) >= 9.0
+
+    def test_pause_with_existing_offset(self):
+        from bot.api.player import handle_playback_pause
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        cog._started_at[123] = time.time() - 5.0
+        cog._elapsed_offset[123] = 20.0  # already accumulated 20s
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        asyncio.run(handle_playback_pause(request))
+        # offset should be ~25s
+        assert cog._elapsed_offset.get(123, 0.0) >= 24.0
 
     def test_pause_when_not_playing_raises_bad_request(self):
         from bot.api.player import handle_playback_pause
@@ -695,6 +760,20 @@ class TestHandlePlaybackResume:
         assert data == {"resumed": True}
         vm.resume.assert_called_once()
 
+    def test_resume_sets_started_at(self):
+        from bot.api.player import handle_playback_resume
+
+        vm = _make_vm(is_paused=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        before = time.time()
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        asyncio.run(handle_playback_resume(request))
+        after = time.time()
+        started_at = cog._started_at.get(123)
+        assert started_at is not None
+        assert before <= started_at <= after
+
     def test_resume_when_not_paused_raises_bad_request(self):
         from bot.api.player import handle_playback_resume
 
@@ -730,6 +809,8 @@ class TestHandlePlaybackStop:
 
         vm = _make_vm(is_connected=True)
         cog, _, q = _make_music_cog(vm=vm)
+        cog._started_at[123] = time.time()
+        cog._elapsed_offset[123] = 15.0
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_stop(request))
@@ -738,6 +819,8 @@ class TestHandlePlaybackStop:
         vm.stop.assert_called_once()
         q.clear.assert_called_once()
         assert cog._current_tracks.get(123) is None
+        assert cog._started_at.get(123) is None
+        assert cog._elapsed_offset.get(123) == 0.0
         vm.leave.assert_awaited_once()
 
     def test_stop_when_not_connected_raises_bad_request(self):

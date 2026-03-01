@@ -164,6 +164,7 @@ async def handle_queue_add(
 
 async def handle_playback_get(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
     """GET /api/playback?guild_id={id} — return current playback state."""
+    import time  # noqa: PLC0415
     import aiohttp.web  # noqa: PLC0415
 
     guild_id = _require_guild_id(request)
@@ -171,7 +172,7 @@ async def handle_playback_get(request: "aiohttp.web.Request") -> "aiohttp.web.Re
 
     if music is None:
         return aiohttp.web.Response(
-            text=json.dumps({"state": "stopped"}),
+            text=json.dumps({"state": "stopped", "elapsed_seconds": None}),
             content_type="application/json",
         )
 
@@ -183,14 +184,24 @@ async def handle_playback_get(request: "aiohttp.web.Request") -> "aiohttp.web.Re
     else:
         state = "stopped"
 
+    if state == "stopped":
+        elapsed_seconds = None
+    elif state == "playing":
+        started_at = music._started_at.get(guild_id)
+        offset = music._elapsed_offset.get(guild_id, 0.0)
+        elapsed_seconds = (time.time() - started_at + offset) if started_at is not None else None
+    else:  # paused
+        elapsed_seconds = music._elapsed_offset.get(guild_id, 0.0)
+
     return aiohttp.web.Response(
-        text=json.dumps({"state": state}),
+        text=json.dumps({"state": state, "elapsed_seconds": elapsed_seconds}),
         content_type="application/json",
     )
 
 
 async def handle_playback_pause(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
     """POST /api/playback/pause?guild_id={id} — pause playback."""
+    import time  # noqa: PLC0415
     import aiohttp.web  # noqa: PLC0415
 
     guild_id = _require_guild_id(request)
@@ -203,6 +214,10 @@ async def handle_playback_pause(request: "aiohttp.web.Request") -> "aiohttp.web.
     if not vm.is_playing():
         raise aiohttp.web.HTTPBadRequest(reason="Nothing is currently playing")
 
+    started_at = music._started_at.get(guild_id)
+    if started_at is not None:
+        music._elapsed_offset[guild_id] = music._elapsed_offset.get(guild_id, 0.0) + (time.time() - started_at)
+        music._started_at[guild_id] = None
     vm.pause()
     return aiohttp.web.Response(
         text=json.dumps({"paused": True}),
@@ -212,6 +227,7 @@ async def handle_playback_pause(request: "aiohttp.web.Request") -> "aiohttp.web.
 
 async def handle_playback_resume(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
     """POST /api/playback/resume?guild_id={id} — resume playback."""
+    import time  # noqa: PLC0415
     import aiohttp.web  # noqa: PLC0415
 
     guild_id = _require_guild_id(request)
@@ -225,6 +241,7 @@ async def handle_playback_resume(request: "aiohttp.web.Request") -> "aiohttp.web
         raise aiohttp.web.HTTPBadRequest(reason="Playback is not paused")
 
     vm.resume()
+    music._started_at[guild_id] = time.time()
     return aiohttp.web.Response(
         text=json.dumps({"resumed": True}),
         content_type="application/json",
@@ -246,6 +263,8 @@ async def handle_playback_stop(request: "aiohttp.web.Request") -> "aiohttp.web.R
         raise aiohttp.web.HTTPBadRequest(reason="Not in a voice channel")
 
     vm.stop()
+    music._started_at[guild_id] = None
+    music._elapsed_offset[guild_id] = 0.0
     queue = music._queue_registry.get_queue(guild_id)
     queue.clear()
     music._current_tracks[guild_id] = None

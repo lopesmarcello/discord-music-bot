@@ -80,12 +80,17 @@ export async function searchYouTube(query: string, limit = 5): Promise<SearchRes
 
 export type PlaybackState = 'playing' | 'paused' | 'stopped';
 
+export interface PlaybackData {
+  state: PlaybackState;
+  elapsedSeconds: number | null;
+}
+
 /** Fetch the current playback state for a guild. */
-export async function fetchPlayback(guildId: string): Promise<PlaybackState> {
+export async function fetchPlayback(guildId: string): Promise<PlaybackData> {
   const res = await fetch(`/api/playback?guild_id=${encodeURIComponent(guildId)}`);
   if (!res.ok) throw new Error(`Unexpected status ${res.status}`);
-  const data = await res.json() as { state: PlaybackState };
-  return data.state;
+  const data = await res.json() as { state: PlaybackState; elapsed_seconds: number | null };
+  return { state: data.state, elapsedSeconds: data.elapsed_seconds };
 }
 
 /** Pause playback for a guild. */

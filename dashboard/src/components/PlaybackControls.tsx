@@ -15,8 +15,8 @@ export default function PlaybackControls({ guildId, refreshTrigger, onStopped }:
 
   const loadState = useCallback(() => {
     fetchPlayback(guildId)
-      .then(s => {
-        setState(s);
+      .then(data => {
+        setState(data.state);
         setError(null);
       })
       .catch(() => setError('Failed to load playback state.'));

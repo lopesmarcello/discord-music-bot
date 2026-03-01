@@ -8,7 +8,7 @@
       "title": "Add Python linting configuration",
       "description": "As a developer, I want a Python linter configured so that CI can enforce code style consistently.",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "ruff added to [project.optional-dependencies] dev extras in pyproject.toml",
         "[tool.ruff] section added to pyproject.toml with line-length = 88 and select = ['E', 'F', 'W']",

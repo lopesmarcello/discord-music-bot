@@ -49,10 +49,12 @@ export async function fetchQueue(guildId: string): Promise<QueueData> {
   return res.json() as Promise<QueueData>;
 }
 
-/** Skip the current track for a guild. */
-export async function skipTrack(guildId: string): Promise<void> {
+/** Skip the current track for a guild. Returns the updated queue state. */
+export async function skipTrack(guildId: string): Promise<QueueData> {
   const res = await fetch(`/api/queue/skip?guild_id=${encodeURIComponent(guildId)}`, { method: 'POST' });
   if (!res.ok) throw new Error(`Unexpected status ${res.status}`);
+  const data = await res.json() as { skipped: boolean; current: Track | null; tracks: Track[] };
+  return { current: data.current, tracks: data.tracks };
 }
 
 /** Clear the upcoming queue for a guild. */

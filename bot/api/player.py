@@ -84,10 +84,13 @@ async def handle_queue_skip(request: "aiohttp.web.Request") -> "aiohttp.web.Resp
     music._skipping[guild_id] = False
 
     current = music._current_tracks.get(guild_id)
+    queue = music._queue_registry.get_queue(guild_id)
+    tracks = queue.list()
     return aiohttp.web.Response(
         text=json.dumps({
             "skipped": True,
             "current": _track_dict(current) if current is not None else None,
+            "tracks": [_track_dict(t) for t in tracks],
         }),
         content_type="application/json",
     )

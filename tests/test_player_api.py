@@ -315,6 +315,76 @@ class TestHandleQueueSkip:
         asyncio.run(handle_queue_skip(request))
         assert cog._skipping.get(123, False) is False, "_skipping must be False after skip completes"
 
+    def test_skip_response_includes_tracks(self):
+        """handle_queue_skip response must include 'tracks' so dashboard can sync immediately."""
+        from bot.api.player import handle_queue_skip
+
+        next_track = _make_track("Next Song")
+        queued_track = _make_track("Queued Song", url="http://example.com/queued")
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+
+        # After _play_next: current track set, one track still in queue
+        async def fake_play_next(guild_id):
+            cog._current_tracks[guild_id] = next_track
+
+        cog._play_next.side_effect = fake_play_next
+        q.list.return_value = [queued_track]
+
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_queue_skip(request))
+        data = json.loads(resp.text)
+        assert "tracks" in data, "skip response must include 'tracks' for immediate dashboard sync"
+        assert isinstance(data["tracks"], list)
+        assert len(data["tracks"]) == 1
+        assert data["tracks"][0]["title"] == "Queued Song"
+
+    def test_skip_last_song_response_has_null_current_and_empty_tracks(self):
+        """Skipping the only playing song returns null current and empty tracks list."""
+        from bot.api.player import handle_queue_skip
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        # _play_next leaves current_tracks[guild_id] unset (empty queue)
+        cog._play_next.side_effect = AsyncMock()
+        q.list.return_value = []
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_queue_skip(request))
+        data = json.loads(resp.text)
+        assert data["skipped"] is True
+        assert data["current"] is None
+        assert data["tracks"] == []
+
+    def test_skip_response_current_matches_queue_get_after_skip(self):
+        """The 'current' in skip response must match what GET /api/queue returns immediately after."""
+        from bot.api.player import handle_queue_get, handle_queue_skip
+
+        next_track = _make_track("Consistent Track", url="http://example.com/consistent")
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+
+        async def fake_play_next(guild_id):
+            cog._current_tracks[guild_id] = next_track
+
+        cog._play_next.side_effect = fake_play_next
+        q.list.return_value = []
+
+        bot = _make_bot(cog)
+        skip_request = _make_request(guild_id=123, app_data={"bot": bot})
+        skip_resp = asyncio.run(handle_queue_skip(skip_request))
+        skip_data = json.loads(skip_resp.text)
+
+        # Now GET /api/queue should return the same current
+        get_request = _make_request(guild_id=123, app_data={"bot": bot})
+        get_resp = asyncio.run(handle_queue_get(get_request))
+        get_data = json.loads(get_resp.text)
+
+        assert skip_data["current"] == get_data["current"], (
+            "skip response 'current' must match subsequent GET /api/queue 'current'"
+        )
+
 
 # ---------------------------------------------------------------------------
 # POST /api/queue/clear

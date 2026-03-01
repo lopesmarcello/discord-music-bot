@@ -41,8 +41,9 @@ export default function QueueView({ guildId, refreshTrigger }: QueueViewProps) {
   async function handleSkip() {
     setBusy(true);
     try {
-      await skipTrack(guildId);
-      loadQueue();
+      const updated = await skipTrack(guildId);
+      setQueue(updated);
+      setError(null);
     } catch {
       setError('Skip failed.');
     } finally {

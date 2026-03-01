@@ -1,177 +1,54 @@
 {
-  "branchName": "feat/guild-picker-and-ui-redesign",
-  "title": "Guild Picker Fallback & Music App UI Redesign",
+  "branchName": "fix/sidebar-fix-and-search-repair",
+  "title": "Sidebar Safe Area Fix & Search Backend Repair",
   "userStories": [
     {
-      "id": "US-001",
-      "title": "Add /api/guilds endpoint",
-      "description": "As a developer, I need an API endpoint that returns the list of guilds the bot is currently a member of so the frontend can render the guild picker.",
-      "passes": true,
+      "id": "US-013",
+      "title": "Fix sidebar height to respect PlayerBar safe area",
+      "description": "As a user, I want the sidebar's bottom section (guild name and collapse button) to be visible and clickable at all times, so I can always collapse the sidebar or see which server I'm in.",
+      "passes": false,
       "acceptanceCriteria": [
-        "GET /api/guilds returns JSON: { \"guilds\": [{ \"id\": \"...\", \"name\": \"...\", \"icon\": \"...\" | null }] }",
-        "Route is protected by the existing JWT middleware (must be authenticated)",
-        "icon is the Discord icon hash string (not a full URL); frontend builds the CDN URL",
-        "Returns empty list [] if bot has no guilds",
-        "Add fetchGuilds() to dashboard/src/api.ts with type Guild { id, name, icon: string | null }",
+        "The sidebar's guild info row and collapse toggle button are fully visible above the PlayerBar",
+        "No sidebar content is occluded by the 80px PlayerBar at the bottom of the viewport",
+        "Fix is achieved by changing Sidebar.tsx sidebar height from 100vh to calc(100vh - 80px)",
+        "Collapsed and expanded sidebar states both work correctly",
         "Typecheck passes"
       ]
     },
     {
-      "id": "US-002",
-      "title": "Add thumbnail field to AudioTrack model and API responses",
-      "description": "As a developer, I need the current-track data to include a thumbnail URL so the bottom player bar can display album art.",
-      "passes": true,
+      "id": "US-014",
+      "title": "Replace yt-dlp YouTube search with YouTube Data API v3",
+      "description": "As a user, I want to search for songs by name and get results, so I can add them to the queue.",
+      "passes": false,
       "acceptanceCriteria": [
-        "AudioTrack dataclass gains field thumbnail: str (empty string when unavailable)",
-        "_make_track in resolver.py populates thumbnail from yt-dlp info[\"thumbnail\"] (fallback \"\")",
-        "/api/queue response includes \"thumbnail\" on both current and tracks[] items",
-        "Track interface in api.ts gains thumbnail: string",
+        "YOUTUBE_API_KEY is added to .env.example with a descriptive comment",
+        "AudioResolver.search() in bot/audio/resolver.py uses the YouTube Data API v3 when YOUTUBE_API_KEY is set in the environment",
+        "Results include: title, url (full youtube.com/watch?v=... URL), duration (seconds, int), thumbnail (URL)",
+        "The YouTube API call is made with urllib (sync) to avoid new dependencies",
         "Typecheck passes"
       ]
     },
     {
-      "id": "US-003",
-      "title": "Add elapsed_seconds to /api/playback response",
-      "description": "As a developer, I need to know how many seconds into the current track we are so the frontend can render an accurate progress bar.",
-      "passes": true,
+      "id": "US-015",
+      "title": "Add SoundCloud fallback when YouTube search is unavailable",
+      "description": "As a user, I want search to still return results even if the YouTube API key is not configured, so I can use the bot out of the box.",
+      "passes": false,
       "acceptanceCriteria": [
-        "Music cog records _started_at: dict[int, float] — a unix timestamp per guild when a track starts playing, reset to None when stopped/paused",
-        "When paused, elapsed is frozen (store offset); when resumed, timestamp resets accounting for offset",
-        "/api/playback response gains \"elapsed_seconds\": float | None (None when stopped)",
-        "fetchPlayback return type in api.ts gains elapsedSeconds: number | null",
+        "When YOUTUBE_API_KEY is not set, AudioResolver.search() falls back to SoundCloud search via yt-dlp using scsearch{max_results}:{query}",
+        "When YOUTUBE_API_KEY is set but the YouTube API call raises an exception, AudioResolver.search() logs a warning and falls back to SoundCloud search",
+        "Results from the SoundCloud fallback have the same shape: title, url, duration, thumbnail",
         "Typecheck passes"
       ]
     },
     {
-      "id": "US-004",
-      "title": "Set up global design tokens",
-      "description": "As a developer, I need CSS custom properties (design tokens) defined globally so all components share the same colours and typography without inline duplication.",
-      "passes": true,
+      "id": "US-016",
+      "title": "Surface search errors as a clear 'Search unavailable' message on the frontend",
+      "description": "As a user, I want to see a friendly error message when search fails, so I know something is wrong rather than seeing a blank screen.",
+      "passes": false,
       "acceptanceCriteria": [
-        "index.css defines all tokens from the colour palette table as -- CSS variables on :root",
-        "Global resets applied: box-sizing: border-box, margin: 0, font-family set to system stack",
-        "body background set to var(--bg-base), colour to var(--text-primary)",
-        "Tokens are used (not hardcoded values) in at least one component to confirm wiring works",
-        "Typecheck passes"
-      ]
-    },
-    {
-      "id": "US-005",
-      "title": "Build GuildPickerPage component",
-      "description": "As an authenticated user, I want to see a list of servers the bot is in when I open the dashboard without a guild link, so I can pick where to go.",
-      "passes": true,
-      "acceptanceCriteria": [
-        "src/pages/GuildPickerPage.tsx created",
-        "Calls fetchGuilds() on mount; shows a loading skeleton while fetching",
-        "Renders a grid of guild cards — each card shows the guild icon (or a placeholder initial letter circle) and guild name",
-        "Clicking a guild card navigates to /?guild={id}",
-        "Empty state shown if guilds list is empty: \"The bot is not in any servers yet.\"",
-        "Error state shown if fetch fails: \"Could not load servers. Please try again.\"",
-        "Guild card uses orange accent on hover",
-        "Typecheck passes"
-      ]
-    },
-    {
-      "id": "US-006",
-      "title": "Update App.tsx routing for guild picker flow",
-      "description": "As a user, I want the app to automatically route me to the guild picker when I'm logged in but haven't selected a guild, so I never see an error screen.",
-      "passes": true,
-      "acceptanceCriteria": [
-        "When auth.status === 'authenticated' and guildId is undefined, render <GuildPickerPage> instead of the old 'no guild' state",
-        "When auth.status === 'authenticated' and guildId is defined, render <DashboardPage> (existing behaviour)",
-        "GuildPickerPage receives the user and onLogout props so the header/sidebar can render",
-        "Typecheck passes"
-      ]
-    },
-    {
-      "id": "US-007",
-      "title": "Build collapsible Sidebar component",
-      "description": "As a user, I want a left sidebar that I can collapse to icon-only mode so I have more screen space while still being able to navigate.",
-      "passes": true,
-      "acceptanceCriteria": [
-        "src/components/Sidebar.tsx created",
-        "Expanded state (220 px wide): shows bot logo/wordmark at top, nav items with icon + label, current guild name and icon at bottom",
-        "Collapsed state (64 px wide): shows icons only, no labels; guild name hidden",
-        "Toggle button at the bottom of the sidebar switches between states",
-        "Collapsed/expanded state is stored in localStorage and restored on reload",
-        "Nav items: Queue (home icon), Search (magnifier icon) — clicking sets active view in DashboardPage",
-        "Active nav item highlighted with orange left-border and slightly lighter background",
-        "Sidebar background uses var(--sidebar-bg)",
-        "Typecheck passes"
-      ]
-    },
-    {
-      "id": "US-008",
-      "title": "Build AppShell layout component",
-      "description": "As a developer, I need a layout wrapper that positions the sidebar, main content area, and bottom player bar correctly so all pages share the same chrome.",
-      "passes": true,
-      "acceptanceCriteria": [
-        "src/components/AppShell.tsx created; accepts sidebar, children, and playerBar render props/slots",
-        "Uses CSS Grid: [sidebar] [main] columns with sidebar width driven by collapsed state",
-        "Bottom player bar is position: fixed; bottom: 0; left: 0; right: 0; height: 80px",
-        "Main content area has padding-bottom: 96px to avoid content hiding behind the player bar",
-        "Header inside main area shows: current guild name + icon on left; user avatar + username + logout on right",
-        "DashboardPage and GuildPickerPage both render inside AppShell",
-        "Typecheck passes"
-      ]
-    },
-    {
-      "id": "US-009",
-      "title": "Build PlayerBar bottom component",
-      "description": "As a user, I want a persistent bottom bar showing what's currently playing, with thumbnail, title, progress, and playback controls, so I always know the playback state and can control it from anywhere.",
-      "passes": true,
-      "acceptanceCriteria": [
-        "src/components/PlayerBar.tsx created",
-        "Left section: 56x56 px thumbnail with fallback grey square; track title and source label",
-        "Centre section: Play/Pause button, Skip button, Stop button",
-        "Right section: progress bar showing elapsed / duration as filled orange bar",
-        "Progress bar updates every second via setInterval when state is 'playing'",
-        "When state is 'stopped', shows 'Nothing playing' placeholder and controls are dimmed",
-        "Player bar background: var(--player-bg) with 1px solid var(--border) top border",
-        "Polls /api/playback and /api/queue every 5s to stay in sync",
-        "Typecheck passes"
-      ]
-    },
-    {
-      "id": "US-010",
-      "title": "Redesign QueueView component",
-      "description": "As a user, I want the queue list to look like a Spotify track list — clean rows with index, thumbnail, title, and duration — styled with the new design tokens.",
-      "passes": true,
-      "acceptanceCriteria": [
-        "Track rows use var(--bg-surface) background with var(--border) border on hover",
-        "Now Playing track row has orange left accent bar and slightly elevated background",
-        "Each row shows: index number (muted), 40x40 thumbnail (or letter placeholder), title, duration",
-        "Skip button replaced by skip icon inline in the now-playing row",
-        "Clear Queue button styled as small outlined button using var(--accent)",
-        "Empty state message: 'Queue is empty' in muted text, centred",
-        "Typecheck passes"
-      ]
-    },
-    {
-      "id": "US-011",
-      "title": "Redesign SearchBar component",
-      "description": "As a user, I want the search experience to look like a music app — full-width search input, results with thumbnails, and an Add button per result.",
-      "passes": true,
-      "acceptanceCriteria": [
-        "Search input is full-width with rounded corners, var(--bg-elevated) background, orange focus ring",
-        "Search button uses var(--accent) background",
-        "Each result row shows: 48x48 thumbnail, title, duration, and an '+ Add' button",
-        "'+ Add' button uses var(--accent) outline style; transitions to filled orange while adding",
-        "After adding, the row shows a brief 'Added ✓' confirmation before reverting",
-        "Typecheck passes"
-      ]
-    },
-    {
-      "id": "US-012",
-      "title": "Redesign LoginPage component",
-      "description": "As a user, I want the login page to match the new design — dark charcoal background, Claude orange accents.",
-      "passes": true,
-      "acceptanceCriteria": [
-        "Background: var(--bg-base) solid",
-        "Card: var(--bg-surface) with var(--border) border, 16px border-radius",
-        "App logo or wordmark at top of card",
-        "'Login with Discord' button: var(--accent) background, white text",
-        "Error banner uses design token colours",
+        "handle_search() in bot/api/search.py wraps resolver.search() in a try/except; on any exception it returns HTTP 503 with {\"error\": \"Search unavailable\"} JSON body",
+        "SearchBar.tsx catches the error from searchYouTube() and sets the error state to \"Search unavailable. Please try again later.\"",
+        "The error message is displayed in the existing <p style={styles.error}> element",
         "Typecheck passes"
       ]
     }

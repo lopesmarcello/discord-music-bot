@@ -34,7 +34,7 @@ export default function Sidebar({ activeView, onViewChange, guildId, guildName, 
       style={{
         width: collapsed ? 64 : 220,
         minWidth: collapsed ? 64 : 220,
-        height: '100vh',
+        height: 'calc(100vh - 80px)',
         background: 'var(--sidebar-bg)',
         borderRight: '1px solid var(--border)',
         display: 'flex',

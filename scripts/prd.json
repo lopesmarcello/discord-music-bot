@@ -44,7 +44,7 @@
       "id": "US-016",
       "title": "Surface search errors as a clear 'Search unavailable' message on the frontend",
       "description": "As a user, I want to see a friendly error message when search fails, so I know something is wrong rather than seeing a blank screen.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "handle_search() in bot/api/search.py wraps resolver.search() in a try/except; on any exception it returns HTTP 503 with {\"error\": \"Search unavailable\"} JSON body",
         "SearchBar.tsx catches the error from searchYouTube() and sets the error state to \"Search unavailable. Please try again later.\"",

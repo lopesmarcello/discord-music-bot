@@ -1,4 +1,8 @@
 ## Codebase Patterns
+- Sidebar height must be calc(100vh - 80px), not 100vh — leaves room for fixed 80px PlayerBar
+- AudioResolver has injectable _http_get_fn for urllib-based HTTP calls (parallels ytdl_class pattern)
+- ISO 8601 duration parsing: PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)? regex; hours*3600+min*60+sec
+- FakeResponse in conftest.py now accepts status= kwarg (added in US-016)
 - PlayerBar polls fetchPlayback + fetchQueue together via Promise.all every 5s; a separate setInterval ticks elapsedSeconds +1 per second when state is 'playing'
 - Python tests use stubs in tests/conftest.py (aiohttp.web, jwt) — never need real aiohttp/PyJWT in tests
 - pytest is not installed; use: PYTHONPATH=/tmp/pypackages:/workspace python3.11 -m pytest tests/ -v
@@ -166,4 +170,37 @@ Started: Sat Feb 28 16:27:50 PST 2026
 - **Learnings for future iterations:**
   - LoginPage uses no AppShell — it's a standalone full-page layout with its own container centering via flexbox
   - Error banner uses semi-transparent red (rgba) background/border rather than a token since there's no error token defined
+---
+
+## 2026-03-01 - US-013
+- What was implemented: Fixed sidebar `height: 100vh` → `calc(100vh - 80px)` so guild info and collapse toggle are never hidden behind the fixed PlayerBar
+- Files changed:
+  - dashboard/src/components/Sidebar.tsx: changed nav height
+  - scripts/prd.json: created new prd.json for sidebar-fix-and-search-repair PRD (US-013–016)
+- **Learnings for future iterations:**
+  - Sidebar uses flexbox column; reducing height to calc(100vh - 80px) is sufficient — no other layout changes needed since bottom section has flexShrink: 0
+---
+
+## 2026-03-01 - US-014 + US-015
+- What was implemented: Replaced yt-dlp ytsearch with YouTube Data API v3 when YOUTUBE_API_KEY is set; added SoundCloud scsearch fallback when key absent or API raises
+- Files changed:
+  - bot/audio/resolver.py: added _parse_iso8601_duration, _YOUTUBE_API_BASE, _http_get_fn injectable, _fetch_json, _search_youtube_api, _search_ytdlp_scsearch; rewrote search()
+  - tests/unit/test_resolver.py: added TestParseIso8601Duration, updated TestSearch to scsearch, added TestSearchYouTubeApi with mock http responses
+  - .env.example: added YOUTUBE_API_KEY entry
+- **Learnings for future iterations:**
+  - YouTube API requires two calls: /search for IDs+snippets, then /videos?part=contentDetails for ISO 8601 durations
+  - Injectable _http_get_fn uses context manager protocol (with fn(url) as resp: resp.read()) — same as urllib.request.urlopen
+  - patch.dict(os.environ, {"YOUTUBE_API_KEY": "key"}) is the clean way to test env-var branches
+---
+
+## 2026-03-01 - US-016
+- What was implemented: Wrapped resolver.search() in try/except in handle_search; returns 503 {"error": "Search unavailable"} on exception; SearchBar shows "Search unavailable. Please try again later."
+- Files changed:
+  - bot/api/search.py: added try/except around resolver.search(); returns 503 Response on exception
+  - dashboard/src/components/SearchBar.tsx: updated catch error message
+  - tests/test_search_api.py: added TestHandleSearchError with two tests for 503 path
+  - tests/conftest.py: added status= kwarg to FakeResponse
+- **Learnings for future iterations:**
+  - FakeResponse needs status= to test HTTP status codes — was missing before this story
+  - The _resolver_factory injection in handle_search makes error-path testing straightforward
 ---

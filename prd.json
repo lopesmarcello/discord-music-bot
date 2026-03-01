@@ -22,7 +22,7 @@
       "title": "Create PR validation CI workflow",
       "description": "As a maintainer, I want every PR to develop to automatically run the full test suite and linters so that broken code cannot be merged.",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "File created at .github/workflows/ci.yml",
         "Workflow triggers on pull_request targeting develop",

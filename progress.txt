@@ -1,0 +1,25 @@
+## Codebase Patterns
+- Python project uses pyproject.toml with setuptools; dev deps in `[project.optional-dependencies]` dev extras
+- Dashboard is in `dashboard/` with `npm run typecheck` as the TS check command (uses tsc)
+- Python linting uses ruff; config in `[tool.ruff]` and `[tool.ruff.lint]` sections of pyproject.toml
+- Branch strategy: `develop` for dev/PRs, `main` for production
+- Python tools (ruff, pytest) may not be installed in the container; use `python3 -m ruff` or ensure via pip install
+- `dashboard/package-lock.json` exists, enabling npm cache in GitHub Actions via `cache-dependency-path: dashboard/package-lock.json`
+- `actions/setup-python@v5` supports `cache: "pip"` directly without needing a separate `actions/cache` step
+- SSH deploy (appleboy/ssh-action) is the deploy mechanism per the PRD technical considerations
+
+---
+
+## 2026-03-01 - US-002
+- What was implemented: Created `.github/workflows/ci.yml` with two parallel jobs:
+  - `test-bot`: Python 3.11, pip cache, `pip install -e ".[dev]"`, `pytest --tb=short`, `ruff check bot/`
+  - `lint-dashboard`: Node.js 20, npm cache, `npm ci`, `npm run typecheck` (working dir: `dashboard/`)
+  - Workflow triggers on `pull_request` targeting `develop`
+- Files changed: `.github/workflows/ci.yml`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Python tools (ruff, pytest) are not installed in the container environment; quality checks for Python must rely on GitHub Actions CI or install via the local Python 3.11 that is present
+  - `dashboard/` has `npm run typecheck` script (`tsc -b --noEmit`) which passed cleanly
+  - `package-lock.json` exists in `dashboard/` enabling npm dependency caching
+  - `actions/setup-python@v5` `cache: "pip"` option handles pip caching without extra steps
+  - For deploy workflows (US-003, US-004) use `appleboy/ssh-action` per PRD technical notes
+---

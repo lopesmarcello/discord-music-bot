@@ -5,6 +5,7 @@ import AppShell from '../components/AppShell';
 import Sidebar from '../components/Sidebar';
 import type { SidebarView } from '../components/Sidebar';
 import PlaybackControls from '../components/PlaybackControls';
+import PlayerBar from '../components/PlayerBar';
 import QueueView from '../components/QueueView';
 import SearchBar from '../components/SearchBar';
 
@@ -44,6 +45,12 @@ export default function DashboardPage({ user, guildId, onLogout }: DashboardPage
           guildId={guildId}
           guildName={guild?.name ?? ''}
           guildIcon={guild?.icon ?? null}
+        />
+      }
+      playerBar={
+        <PlayerBar
+          guildId={guildId}
+          onQueueChanged={() => setQueueRefreshKey(k => k + 1)}
         />
       }
     >

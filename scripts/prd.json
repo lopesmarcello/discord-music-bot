@@ -119,7 +119,7 @@
       "id": "US-009",
       "title": "Build PlayerBar bottom component",
       "description": "As a user, I want a persistent bottom bar showing what's currently playing, with thumbnail, title, progress, and playback controls, so I always know the playback state and can control it from anywhere.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "src/components/PlayerBar.tsx created",
         "Left section: 56x56 px thumbnail with fallback grey square; track title and source label",

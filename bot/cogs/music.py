@@ -81,6 +81,38 @@ class Music(commands.Cog):
     # Commands
     # ------------------------------------------------------------------
 
+    @commands.hybrid_command(name="join", description="Join your current voice channel")
+    async def join(self, ctx: commands.Context) -> None:
+        """Join the voice channel the user is currently in."""
+        if ctx.author.voice is None:
+            await ctx.send("You must be in a voice channel for me to join.")
+            return
+
+        vm = self._get_voice_manager(ctx.guild.id)
+        if vm.is_connected():
+            await ctx.send("I'm already in a voice channel.")
+            return
+
+        await vm.join(ctx.author.voice.channel)
+        vm.set_on_track_end(self._make_on_track_end(ctx.guild.id))
+        await ctx.send(f"Joined **{ctx.author.voice.channel.name}**.")
+
+    @commands.hybrid_command(name="leave", description="Leave the current voice channel")
+    async def leave(self, ctx: commands.Context) -> None:
+        """Leave the voice channel, stop playback, and clear the queue."""
+        vm = self._get_voice_manager(ctx.guild.id)
+        if not vm.is_connected():
+            await ctx.send("I'm not in a voice channel.")
+            return
+
+        vm.stop()
+        self._started_at[ctx.guild.id] = None
+        self._elapsed_offset[ctx.guild.id] = 0.0
+        self._queue_registry.get_queue(ctx.guild.id).clear()
+        self._current_tracks[ctx.guild.id] = None
+        await vm.leave()
+        await ctx.send("Left the voice channel.")
+
     @commands.hybrid_command(name="play", description="Play a song by URL or search query")
     async def play(self, ctx: commands.Context, *, query: str) -> None:
         """Play a song in the voice channel."""

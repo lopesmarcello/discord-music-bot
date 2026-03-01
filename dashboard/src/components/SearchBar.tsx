@@ -64,8 +64,13 @@ export default function SearchBar({ guildId, onAdded }: SearchBarProps) {
         addedTimers.current.delete(url);
       }, 2000);
       addedTimers.current.set(url, timer);
-    } catch {
-      setError('Failed to add track to queue.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.toLowerCase().includes('voice channel')) {
+        setError('The bot is not in a voice channel. Use /join in Discord first, then try again.');
+      } else {
+        setError('Failed to add track to queue.');
+      }
     } finally {
       setAdding(null);
     }

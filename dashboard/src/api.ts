@@ -118,7 +118,10 @@ export async function addToQueue(guildId: string, url: string): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url }),
   });
-  if (!res.ok) throw new Error(`Add to queue failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(body || `Add to queue failed: ${res.status}`);
+  }
 }
 
 /** Fetch the list of guilds the bot is in. */

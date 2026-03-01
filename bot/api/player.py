@@ -146,10 +146,15 @@ async def handle_queue_add(
     except UnsupportedSourceError as exc:
         raise aiohttp.web.HTTPBadRequest(reason=str(exc))
 
+    vm = music._get_voice_manager(guild_id)
+    if not vm.is_connected():
+        raise aiohttp.web.HTTPConflict(
+            reason="Bot is not in a voice channel. Use /join in Discord first."
+        )
+
     queue = music._queue_registry.get_queue(guild_id)
     queue.add(track)
 
-    vm = music._get_voice_manager(guild_id)
     if not vm.is_playing() and not vm.is_paused():
         await music._play_next(guild_id)
 

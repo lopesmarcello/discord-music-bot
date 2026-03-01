@@ -19,7 +19,8 @@ def create_bot() -> commands.Bot:
 
     @bot.event
     async def on_ready() -> None:
-        await bot.tree.sync()
+        for guild in bot.guilds:
+            await bot.tree.sync(guild=guild)
         print(f"Logged in as {bot.user} (ID: {bot.user.id})")
 
     # Load cogs

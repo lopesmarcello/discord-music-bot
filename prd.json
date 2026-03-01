@@ -37,7 +37,7 @@
       "title": "Create develop branch push CI/CD workflow",
       "description": "As a developer, I want the dev environment to automatically update when code is merged into develop so the team always has a working preview of the latest changes.",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "File created at .github/workflows/deploy-dev.yml",
         "Workflow triggers on push to develop",

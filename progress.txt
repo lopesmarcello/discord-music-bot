@@ -23,3 +23,18 @@
   - `actions/setup-python@v5` `cache: "pip"` option handles pip caching without extra steps
   - For deploy workflows (US-003, US-004) use `appleboy/ssh-action` per PRD technical notes
 ---
+
+## 2026-03-01 - US-003
+- What was implemented: Created `.github/workflows/deploy-dev.yml` with CI checks + SSH deploy to development environment
+  - Reuses same `test-bot` (Python 3.11) and `lint-dashboard` (Node.js 20) jobs from ci.yml
+  - `deploy` job runs after both CI jobs pass (`needs: [test-bot, lint-dashboard]`)
+  - Uses `environment: development` GitHub Environment
+  - SSH deploy via `appleboy/ssh-action@v1` using `DEV_HOST`, `DEV_USER`, `DEV_SSH_KEY`, `DEV_DEPLOY_PATH` secrets
+  - Deploy script: `docker compose pull && docker compose up -d --build`
+  - Triggers on `push` to `develop`
+- Files changed: `.github/workflows/deploy-dev.yml`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Deploy jobs should use `needs: [test-bot, lint-dashboard]` to enforce CI before deploy
+  - `appleboy/ssh-action@v1` is the SSH deploy action; secrets pattern: `DEV_*` for dev, `PROD_*` for prod
+  - `environment: development` / `environment: production` references GitHub Environments for secrets scoping and deployment tracking
+---

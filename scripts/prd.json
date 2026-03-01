@@ -136,7 +136,7 @@
       "id": "US-010",
       "title": "Redesign QueueView component",
       "description": "As a user, I want the queue list to look like a Spotify track list — clean rows with index, thumbnail, title, and duration — styled with the new design tokens.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "Track rows use var(--bg-surface) background with var(--border) border on hover",
         "Now Playing track row has orange left accent bar and slightly elevated background",

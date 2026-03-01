@@ -137,3 +137,14 @@ Started: Sat Feb 28 16:27:50 PST 2026
   - SVG icon components (PlayIcon, PauseIcon, SkipIcon, StopIcon) defined locally — no icon library needed
   - PlayerBar onQueueChanged callback triggers queueRefreshKey increment in DashboardPage so QueueView refreshes after skip/stop from the bar
 ---
+
+## 2026-03-01 - US-010
+- What was implemented: Redesigned QueueView component with Spotify-style track rows — index number, 40x40 thumbnail with letter placeholder fallback, title, duration, and skip icon inline for now-playing row
+- Files changed:
+  - dashboard/src/components/QueueView.tsx: added TrackThumbnail sub-component, refactored TrackRow to accept index/onSkip/busy props with hover outline state, replaced section-based layout with flat list, updated styles to use design tokens throughout
+  - scripts/prd.json: marked US-010 passes: true
+- **Learnings for future iterations:**
+  - TrackRow uses `outline` (not border) for hover effect so it doesn't affect layout dimensions alongside the existing borderLeft
+  - `index !== undefined ? index : null` pattern used to hide the index column for now-playing row (which shows skip icon instead)
+  - Error state is unified with loading state: initial render shows "Loading queue…"; if error occurs after load, errorBanner shows inline above the list
+---

@@ -17,6 +17,26 @@
   - YOUTUBE_API_KEY is optional in .env.example and falls back to yt-dlp
 ---
 
+## 2026-03-01 - US-006
+- What was implemented: Created `CONTRIBUTING.md` with all 12 sections from FR-6
+  - Welcome message open to external contributors
+  - Code of Conduct reference (Contributor Covenant v2.1)
+  - Getting Started linking to README Quick Start
+  - Branch naming convention with concrete examples (feat/, fix/, chore/, docs/)
+  - Commit message style guide (imperative present tense)
+  - PR process: fork → branch from develop → PR to develop
+  - Copyable PR checklist (Markdown checkboxes)
+  - CI requirements table listing pytest, ruff, and tsc checks
+  - Review process (2-3 business day SLA, 1 maintainer approval)
+  - Internal team section: develop → main promotion steps + rollback procedure
+  - GitHub secrets setup for development and production environments (DEV_HOST, DEV_USER, DEV_SSH_KEY, DEV_DEPLOY_PATH, PROD_HOST, PROD_USER, PROD_SSH_KEY, PROD_DEPLOY_PATH)
+  - Bug reporting and feature request instructions via GitHub Issues
+- Files changed: `CONTRIBUTING.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - All 6 stories are now complete — project is fully done
+  - CONTRIBUTING.md references the specific secret names from the actual workflow files (DEV_HOST not DEV_SSH_HOST as the PRD originally stated)
+---
+
 ## Codebase Patterns
 - Python project uses pyproject.toml with setuptools; dev deps in `[project.optional-dependencies]` dev extras
 - Dashboard is in `dashboard/` with `npm run typecheck` as the TS check command (uses tsc)

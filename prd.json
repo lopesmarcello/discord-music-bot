@@ -85,7 +85,7 @@
       "title": "Create CONTRIBUTING.md",
       "description": "As an external contributor or internal team member, I want clear contribution guidelines so I know the workflow, standards, and how to get my changes accepted.",
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "File created at /workspace/CONTRIBUTING.md",
         "Covers all sections listed in Functional Requirements FR-6",

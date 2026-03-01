@@ -165,7 +165,7 @@
       "id": "US-012",
       "title": "Redesign LoginPage component",
       "description": "As a user, I want the login page to match the new design — dark charcoal background, Claude orange accents.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "Background: var(--bg-base) solid",
         "Card: var(--bg-surface) with var(--border) border, 16px border-radius",

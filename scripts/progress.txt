@@ -158,3 +158,12 @@ Started: Sat Feb 28 16:27:50 PST 2026
   - Input focus ring achieved by tracking `focused` boolean in state and spreading `inputFocused` style (boxShadow + borderColor) onto the input — since inline styles can't use :focus pseudo-class
   - `addButtonAdding` (filled while in-flight) and `addButtonAdded` (filled with opacity after) are distinct style objects spread over the base `addButton` style via `{...styles.addButton, ...(condition ? styles.variant : {})}`
 ---
+
+## 2026-03-01 - US-012
+- What was implemented: Redesigned LoginPage with dark design tokens — solid `var(--bg-base)` background, `var(--bg-surface)` card with `var(--border)` border, music note + wordmark logo, `var(--accent)` login button, token-coloured error banner
+- Files changed:
+  - dashboard/src/pages/LoginPage.tsx: replaced gradient background with `var(--bg-base)`; card uses `var(--bg-surface)` + `var(--border)`; added MusicNoteIcon + logoText wordmark; changed login button to `var(--accent)`; renamed `error` style to `errorBanner` for clarity; updated subtitle and title to use token colours
+- **Learnings for future iterations:**
+  - LoginPage uses no AppShell — it's a standalone full-page layout with its own container centering via flexbox
+  - Error banner uses semi-transparent red (rgba) background/border rather than a token since there's no error token defined
+---

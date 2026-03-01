@@ -87,7 +87,7 @@
       "id": "US-007",
       "title": "Build collapsible Sidebar component",
       "description": "As a user, I want a left sidebar that I can collapse to icon-only mode so I have more screen space while still being able to navigate.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "src/components/Sidebar.tsx created",
         "Expanded state (220 px wide): shows bot logo/wordmark at top, nav items with icon + label, current guild name and icon at bottom",

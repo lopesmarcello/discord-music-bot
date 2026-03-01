@@ -91,3 +91,15 @@ Started: Sat Feb 28 16:27:50 PST 2026
   - Navigation to guild: `window.location.href = '/?guild=...'` (not React Router, just direct URL change since guild selection changes the entire app state)
   - Loading skeleton uses same card dimensions as real cards but with opacity: 0.5 for the shimmer effect
 ---
+
+## 2026-02-28 - US-007
+- What was implemented: Created collapsible Sidebar component with expanded (220px) and collapsed (64px) states, localStorage persistence, Queue/Search nav items, and guild info at bottom
+- Files changed:
+  - dashboard/src/components/Sidebar.tsx (new): full Sidebar with BotLogo, NavItem, HomeIcon, SearchIcon, ChevronLeft/Right SVG icons; localStorage-backed collapsed state
+- **Learnings for future iterations:**
+  - Sidebar exports `SidebarView = 'queue' | 'search'` type alongside the component — import both when wiring into DashboardPage/AppShell
+  - NavItem uses `borderLeft: '3px solid var(--accent)'` for active state and `var(--bg-elevated)` background for both active and hover
+  - localStorage collapse key: `sidebar_collapsed` — value is string `'true'` or `'false'`
+  - SVG icons are defined as small local components (HomeIcon, SearchIcon, etc.) — no external icon library needed
+  - `title` prop on NavItem button provides tooltip in collapsed mode for accessibility
+---

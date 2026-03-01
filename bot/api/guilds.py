@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 async def handle_guilds_get(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
     """GET /api/guilds — return the list of guilds the bot is in."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     bot = request.app.get("bot")
     if bot is None:
@@ -36,6 +36,6 @@ async def handle_guilds_get(request: "aiohttp.web.Request") -> "aiohttp.web.Resp
 
 def setup_guilds_routes(app: "aiohttp.web.Application") -> None:
     """Register guilds route on the aiohttp application."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     app.router.add_get("/api/guilds", handle_guilds_get)

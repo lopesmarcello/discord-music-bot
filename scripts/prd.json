@@ -6,7 +6,7 @@
       "id": "US-013",
       "title": "Fix sidebar height to respect PlayerBar safe area",
       "description": "As a user, I want the sidebar's bottom section (guild name and collapse button) to be visible and clickable at all times, so I can always collapse the sidebar or see which server I'm in.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "The sidebar's guild info row and collapse toggle button are fully visible above the PlayerBar",
         "No sidebar content is occluded by the 80px PlayerBar at the bottom of the viewport",

@@ -19,12 +19,17 @@ def _make_mock_ydl_class(info: dict) -> MagicMock:
     return mock_class
 
 
-def _youtube_info(title="Test Song", url="https://youtube.com/watch?v=abc") -> dict:
+def _youtube_info(
+    title="Test Song",
+    url="https://youtube.com/watch?v=abc",
+    thumbnail="https://i.ytimg.com/vi/abc/default.jpg",
+) -> dict:
     return {
         "title": title,
         "webpage_url": url,
         "url": "https://stream.example.com/audio.webm",
         "duration": 210,
+        "thumbnail": thumbnail,
     }
 
 
@@ -60,6 +65,28 @@ class TestAudioTrack:
         assert track.stream_url == "https://stream.example.com"
         assert track.duration == 300
         assert track.source == "youtube"
+        assert track.thumbnail == ""
+
+    def test_thumbnail_defaults_to_empty_string(self):
+        track = AudioTrack(
+            title="Song",
+            url="https://example.com",
+            stream_url="https://stream.example.com",
+            duration=300,
+            source="youtube",
+        )
+        assert track.thumbnail == ""
+
+    def test_thumbnail_can_be_set(self):
+        track = AudioTrack(
+            title="Song",
+            url="https://example.com",
+            stream_url="https://stream.example.com",
+            duration=300,
+            source="youtube",
+            thumbnail="https://i.ytimg.com/vi/abc/default.jpg",
+        )
+        assert track.thumbnail == "https://i.ytimg.com/vi/abc/default.jpg"
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +117,26 @@ class TestResolveYouTube:
         resolver = AudioResolver(ytdl_class=mock_ytdl)
         track = resolver.resolve("https://www.youtube.com/watch?v=test123")
         assert track.url == "https://www.youtube.com/watch?v=test123"
+
+    def test_thumbnail_populated_from_info(self):
+        info = _youtube_info(thumbnail="https://i.ytimg.com/vi/abc/maxresdefault.jpg")
+        mock_ytdl = _make_mock_ydl_class(info)
+        resolver = AudioResolver(ytdl_class=mock_ytdl)
+        track = resolver.resolve("https://www.youtube.com/watch?v=abc")
+        assert track.thumbnail == "https://i.ytimg.com/vi/abc/maxresdefault.jpg"
+
+    def test_thumbnail_defaults_to_empty_string_when_missing(self):
+        info = {
+            "title": "No Thumbnail",
+            "webpage_url": "https://youtube.com/watch?v=abc",
+            "url": "https://stream.example.com/audio.webm",
+            "duration": 210,
+            # 'thumbnail' key intentionally absent
+        }
+        mock_ytdl = _make_mock_ydl_class(info)
+        resolver = AudioResolver(ytdl_class=mock_ytdl)
+        track = resolver.resolve("https://www.youtube.com/watch?v=abc")
+        assert track.thumbnail == ""
 
 
 # ---------------------------------------------------------------------------

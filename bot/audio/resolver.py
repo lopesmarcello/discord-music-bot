@@ -18,6 +18,7 @@ class AudioTrack:
     stream_url: str
     duration: int  # seconds
     source: str  # "youtube", "soundcloud", "search"
+    thumbnail: str = ""  # empty string when unavailable
 
 
 # URL detection patterns
@@ -64,6 +65,7 @@ class AudioResolver:
             stream_url=info["url"],
             duration=info.get("duration", 0),
             source=source,
+            thumbnail=info.get("thumbnail", ""),
         )
 
     # ------------------------------------------------------------------

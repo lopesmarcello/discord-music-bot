@@ -15,6 +15,7 @@ export interface Track {
   url: string;
   duration: number | null;
   source: string;
+  thumbnail: string;
 }
 
 export interface QueueData {

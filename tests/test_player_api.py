@@ -28,12 +28,14 @@ def _make_track(
     url="http://example.com/song",
     duration=180,
     source="youtube",
+    thumbnail="",
 ):
     track = MagicMock()
     track.title = title
     track.url = url
     track.duration = duration
     track.source = source
+    track.thumbnail = thumbnail
     return track
 
 
@@ -165,6 +167,7 @@ class TestHandleQueueGet:
             "url": "http://example.com/a",
             "duration": 120,
             "source": "youtube",
+            "thumbnail": "",
         }
         assert data["tracks"] == []
 

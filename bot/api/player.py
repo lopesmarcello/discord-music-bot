@@ -35,6 +35,7 @@ def _track_dict(track) -> dict:
         "url": track.url,
         "duration": track.duration,
         "source": track.source,
+        "thumbnail": track.thumbnail,
     }
 
 

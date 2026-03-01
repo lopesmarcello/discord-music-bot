@@ -104,7 +104,7 @@
       "id": "US-008",
       "title": "Build AppShell layout component",
       "description": "As a developer, I need a layout wrapper that positions the sidebar, main content area, and bottom player bar correctly so all pages share the same chrome.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "src/components/AppShell.tsx created; accepts sidebar, children, and playerBar render props/slots",
         "Uses CSS Grid: [sidebar] [main] columns with sidebar width driven by collapsed state",

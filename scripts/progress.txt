@@ -11,6 +11,9 @@
 - New API modules follow pattern: handle_X_get() function + setup_X_routes(app) function
 - Design tokens defined in dashboard/src/index.css :root — use var(--token-name) in all components; token list: --bg-base, --bg-surface, --bg-elevated, --sidebar-bg, --player-bg, --border, --text-primary, --text-muted, --accent, --accent-hover
 - React inline styles can reference CSS variables: style={{ background: 'var(--bg-base)' }}
+- AppShell is the layout wrapper for all authenticated pages — import it in page components (not App.tsx); it provides the header, sidebar slot, main content area, and fixed playerBar slot
+- AppShell grid: `gridTemplateColumns: sidebar ? 'auto 1fr' : '1fr'` — sidebar's own width (220/64px) drives the column width via `auto`
+- DashboardPage fetches guilds list to resolve the current guild's name/icon (needed for header and Sidebar bottom section)
 
 # Ralph Progress Log
 Started: Sat Feb 28 16:27:50 PST 2026
@@ -90,6 +93,22 @@ Started: Sat Feb 28 16:27:50 PST 2026
   - Guild icon CDN URL pattern: `https://cdn.discordapp.com/icons/{guild.id}/{guild.icon}.png?size=64`
   - Navigation to guild: `window.location.href = '/?guild=...'` (not React Router, just direct URL change since guild selection changes the entire app state)
   - Loading skeleton uses same card dimensions as real cards but with opacity: 0.5 for the shimmer effect
+---
+
+## 2026-02-28 - US-008
+- What was implemented: Created AppShell layout component; updated DashboardPage and GuildPickerPage to render inside it
+- Files changed:
+  - dashboard/src/components/AppShell.tsx (new): grid layout with optional sidebar slot, header (guild info left, user info right), scrollable main content, fixed playerBar slot
+  - dashboard/src/pages/DashboardPage.tsx: removed own header; now renders inside AppShell with Sidebar as sidebar slot; fetches guild info via fetchGuilds() for header and Sidebar; manages activeView state to switch between Queue and Search
+  - dashboard/src/pages/GuildPickerPage.tsx: removed own header; now renders inside AppShell (no sidebar, no playerBar); "Select a Server" title moved into main content area
+  - scripts/prd.json: marked US-008 passes: true
+- **Learnings for future iterations:**
+  - AppShell uses CSS Grid `gridTemplateColumns: sidebar ? 'auto 1fr' : '1fr'` — the `auto` column tracks Sidebar's own 220/64px width
+  - AppShell container uses `height: 100vh; overflow: hidden` with main content scrolling internally via `overflowY: auto` — this avoids double scrollbars
+  - Main content area sets `paddingBottom: 96px` so content is not hidden by the fixed 80px player bar
+  - DashboardPage fetches guilds and finds the current guild by ID to get guildName and guildIcon for AppShell header and Sidebar props
+  - DashboardPage now manages SidebarView state and shows either Queue (PlaybackControls + QueueView) or Search (SearchBar) based on Sidebar navigation
+  - void operator used on async handleLogout in onClick handler: `onClick={() => { void handleLogout(); }}` to satisfy TypeScript/ESLint
 ---
 
 ## 2026-02-28 - US-007

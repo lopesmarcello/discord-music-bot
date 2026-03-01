@@ -33,7 +33,7 @@
       "id": "US-003",
       "title": "Add elapsed_seconds to /api/playback response",
       "description": "As a developer, I need to know how many seconds into the current track we are so the frontend can render an accurate progress bar.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "Music cog records _started_at: dict[int, float] — a unix timestamp per guild when a track starts playing, reset to None when stopped/paused",
         "When paused, elapsed is frozen (store offset); when resumed, timestamp resets accounting for offset",

@@ -19,7 +19,7 @@
       "id": "US-014",
       "title": "Replace yt-dlp YouTube search with YouTube Data API v3",
       "description": "As a user, I want to search for songs by name and get results, so I can add them to the queue.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "YOUTUBE_API_KEY is added to .env.example with a descriptive comment",
         "AudioResolver.search() in bot/audio/resolver.py uses the YouTube Data API v3 when YOUTUBE_API_KEY is set in the environment",
@@ -32,7 +32,7 @@
       "id": "US-015",
       "title": "Add SoundCloud fallback when YouTube search is unavailable",
       "description": "As a user, I want search to still return results even if the YouTube API key is not configured, so I can use the bot out of the box.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "When YOUTUBE_API_KEY is not set, AudioResolver.search() falls back to SoundCloud search via yt-dlp using scsearch{max_results}:{query}",
         "When YOUTUBE_API_KEY is set but the YouTube API call raises an exception, AudioResolver.search() logs a warning and falls back to SoundCloud search",

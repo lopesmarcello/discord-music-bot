@@ -12,6 +12,25 @@
 Started: Sun Mar  1 08:33:41 PST 2026
 ---
 
+## 2026-03-01 - US-003
+- Verified QueueView skip behaviour — no code changes needed
+- `onQueueChanged` → increments `queueRefreshKey` → triggers `loadQueue()` (GET only) in QueueView; no double POST
+- By the time `onQueueChanged` fires, `await skipTrack()` has resolved so backend is stable
+- Files changed: `tasks/prd-dashboard-skip-and-guild-fixes.md` (checked off criteria)
+- **Learnings for future iterations:**
+  - `DashboardPage` wires PlayerBar.onQueueChanged to `setQueueRefreshKey((k) => k + 1)`, which QueueView uses as `refreshTrigger`
+  - `refreshTrigger` in QueueView only calls `loadQueue()` (GET `/api/queue`), never a POST
+---
+
+## 2026-03-01 - US-002
+- Fixed `PlayerBar.handleSkip` to use skip response data, removed `fetchData()` call
+- Files changed: `dashboard/src/components/PlayerBar.tsx`
+- **Learnings for future iterations:**
+  - Pattern: `const updated = await skipTrack(guildId); setCurrentTrack(updated.current);`
+  - Do NOT call `fetchData()` right after skip — let 5s poll correct drift
+  - `onQueueChanged?.()` still called to refresh QueueView via `refreshTrigger`
+---
+
 ## 2026-03-01 - US-001
 - Investigated and documented the skip-clearing race condition
 - Files changed: `dashboard/src/components/PlayerBar.tsx` (added race condition comment), `tasks/prd-dashboard-skip-and-guild-fixes.md` (checked off acceptance criteria)

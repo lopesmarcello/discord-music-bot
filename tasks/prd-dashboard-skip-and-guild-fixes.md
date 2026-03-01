@@ -73,9 +73,9 @@ Two production regressions have returned on the VPS deployment:
 - No change needed in QueueView for this story, but verify the behaviour holds after US-002 changes.
 
 **Acceptance Criteria:**
-- [ ] After PlayerBar skip, QueueView shows the next track within the same render cycle (no "Queue is empty" flash).
-- [ ] No duplicate POST to `/api/queue/skip`.
-- [ ] TypeScript typechecks pass.
+- [x] After PlayerBar skip, QueueView shows the next track within the same render cycle (no "Queue is empty" flash).
+- [x] No duplicate POST to `/api/queue/skip`.
+- [x] TypeScript typechecks pass.
 
 ---
 

@@ -49,9 +49,10 @@ class FakeHTTPServiceUnavailable(FakeHTTPException):
 
 
 class FakeResponse:
-    def __init__(self, text="", content_type="text/plain"):
+    def __init__(self, text="", content_type="text/plain", status=200):
         self.text = text
         self.content_type = content_type
+        self.status = status
         self._cookies: dict = {}
 
     def del_cookie(self, name, **kwargs):

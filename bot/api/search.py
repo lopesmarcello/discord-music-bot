@@ -45,7 +45,14 @@ async def handle_search(
             from bot.audio.resolver import AudioResolver  # noqa: PLC0415
             resolver = AudioResolver()
 
-    results = resolver.search(q, max_results=limit)
+    try:
+        results = resolver.search(q, max_results=limit)
+    except Exception:
+        return aiohttp.web.Response(
+            text=json.dumps({"error": "Search unavailable"}),
+            content_type="application/json",
+            status=503,
+        )
 
     return aiohttp.web.Response(
         text=json.dumps({"results": results}),

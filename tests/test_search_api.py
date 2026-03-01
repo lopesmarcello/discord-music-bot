@@ -260,6 +260,39 @@ class TestHandleSearchNoBotInApp:
 
 
 # ---------------------------------------------------------------------------
+# GET /api/search – resolver raises exception → 503 Search unavailable
+# ---------------------------------------------------------------------------
+
+
+class TestHandleSearchError:
+    def test_resolver_exception_returns_503(self):
+        from bot.api.search import handle_search
+
+        def bad_factory():
+            resolver = MagicMock()
+            resolver.search.side_effect = RuntimeError("something broke")
+            return resolver
+
+        request = _make_request(query_params={"q": "test"})
+        resp = asyncio.run(handle_search(request, _resolver_factory=bad_factory))
+        assert resp.status == 503
+        data = json.loads(resp.text)
+        assert data == {"error": "Search unavailable"}
+
+    def test_resolver_exception_returns_json_content_type(self):
+        from bot.api.search import handle_search
+
+        def bad_factory():
+            resolver = MagicMock()
+            resolver.search.side_effect = Exception("fail")
+            return resolver
+
+        request = _make_request(query_params={"q": "test"})
+        resp = asyncio.run(handle_search(request, _resolver_factory=bad_factory))
+        assert resp.content_type == "application/json"
+
+
+# ---------------------------------------------------------------------------
 # create_app integration: search routes are registered
 # ---------------------------------------------------------------------------
 

@@ -42,7 +42,7 @@ export default function SearchBar({ guildId, onAdded }: SearchBarProps) {
       const r = await searchYouTube(query.trim());
       setResults(r);
     } catch {
-      setError('Search failed. Please try again.');
+      setError('Search unavailable. Please try again later.');
     } finally {
       setSearching(false);
     }

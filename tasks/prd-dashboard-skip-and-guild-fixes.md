@@ -157,11 +157,11 @@ Two production regressions have returned on the VPS deployment:
 - If 0 guilds: show a "No common servers found" message instead of an empty grid.
 
 **Acceptance Criteria:**
-- [ ] User with exactly 1 common guild is redirected automatically — guild picker never renders.
-- [ ] User with 0 common guilds sees an informative empty state message.
-- [ ] User with 2+ common guilds sees the normal guild picker grid.
-- [ ] TypeScript typechecks pass.
-- [ ] Verify in browser using dev-browser skill.
+- [x] User with exactly 1 common guild is redirected automatically — guild picker never renders.
+- [x] User with 0 common guilds sees an informative empty state message.
+- [x] User with 2+ common guilds sees the normal guild picker grid.
+- [x] TypeScript typechecks pass.
+- [ ] Verify in browser using dev-browser skill. (no browser tool available in this environment)
 
 ---
 

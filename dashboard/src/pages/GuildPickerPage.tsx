@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Guild, User } from '../api';
 import { fetchGuilds } from '../api';
+import AppShell from '../components/AppShell';
 
 interface GuildPickerPageProps {
   user: User;
@@ -17,26 +18,14 @@ export default function GuildPickerPage({ user, onLogout }: GuildPickerPageProps
       .catch(() => setError(true));
   }, []);
 
-  const avatarUrl = user.avatar
-    ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`
-    : `https://cdn.discordapp.com/embed/avatars/0.png`;
-
   function handleGuildClick(guildId: string) {
     window.location.href = `/?guild=${encodeURIComponent(guildId)}`;
   }
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <h1 style={styles.headerTitle}>Select a Server</h1>
-        <div style={styles.userInfo}>
-          <img src={avatarUrl} alt={user.username} style={styles.avatar} />
-          <span style={styles.username}>{user.username}</span>
-          <button onClick={onLogout} style={styles.logoutButton}>Logout</button>
-        </div>
-      </header>
-
-      <main style={styles.main}>
+    <AppShell user={user} onLogout={onLogout}>
+      <div style={styles.main}>
+        <h1 style={styles.title}>Select a Server</h1>
         {error ? (
           <div style={styles.message}>Could not load servers. Please try again.</div>
         ) : guilds === null ? (
@@ -54,8 +43,8 @@ export default function GuildPickerPage({ user, onLogout }: GuildPickerPageProps
             ))}
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }
 
@@ -89,52 +78,16 @@ function GuildCard({ guild, onClick }: { guild: Guild; onClick: () => void }) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: '100vh',
-    background: 'var(--bg-base)',
-    color: 'var(--text-primary)',
-  },
-  header: {
-    background: 'var(--bg-surface)',
-    borderBottom: '1px solid var(--border)',
-    padding: '0 24px',
-    height: 64,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTitle: {
-    margin: 0,
-    fontSize: 20,
-    fontWeight: 700,
-  },
-  userInfo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: '50%',
-  },
-  username: {
-    fontSize: 14,
-    color: 'var(--text-muted)',
-  },
-  logoutButton: {
-    background: 'transparent',
-    border: '1px solid var(--border)',
-    borderRadius: 6,
-    color: 'var(--text-muted)',
-    cursor: 'pointer',
-    fontSize: 13,
-    padding: '6px 14px',
-  },
   main: {
     maxWidth: 960,
     margin: '0 auto',
     padding: '48px 24px',
+  },
+  title: {
+    margin: '0 0 32px 0',
+    fontSize: 24,
+    fontWeight: 700,
+    color: 'var(--text-primary)',
   },
   grid: {
     display: 'grid',

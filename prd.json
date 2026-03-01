@@ -68,7 +68,7 @@
       "title": "Complete README rewrite",
       "description": "As a new contributor or user, I want a comprehensive README so I can understand the project, set it up locally, and know how to contribute without asking for help.",
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "README includes all sections listed in Functional Requirements FR-5",
         "Architecture diagram shows bot <-> API <-> dashboard <-> Discord relationship",

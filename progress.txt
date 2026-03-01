@@ -1,3 +1,22 @@
+## 2026-03-01 - US-005
+- What was implemented: Complete README rewrite with comprehensive documentation
+  - Added CI/CD badges pointing to all three workflow files (ci.yml, deploy-dev.yml, deploy-prod.yml)
+  - Added ASCII architecture diagram showing bot ↔ API ↔ dashboard ↔ Discord relationships
+  - Rewrote Quick Start with accurate local dev setup (pip install -e ".[dev]", npm run dev)
+  - Expanded environment variables table with all 9 variables including DASHBOARD_URL and YOUTUBE_API_KEY
+  - API reference table covers all 14 routes grouped by category (Auth, Guilds, Queue, Playback, Search)
+  - Added Screenshots section with placeholder text
+  - Added CI/CD Workflows table explaining all three GitHub Actions workflows and required secrets
+  - Added Contributing section linking to CONTRIBUTING.md (to be created in US-006)
+- Files changed: `README.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - The codebase has 14 API routes (not 15 as stated in PRD): 4 auth, 1 guilds, 4 queue, 4 playback, 1 search
+  - GitHub repo URL is `https://github.com/lopesmarcello/discord-music-bot`
+  - Badge URL format: `https://github.com/lopesmarcello/discord-music-bot/actions/workflows/{file}/badge.svg`
+  - DASHBOARD_URL env var is used in auth.py but not in .env.example; it defaults to `http://localhost:3000`
+  - YOUTUBE_API_KEY is optional in .env.example and falls back to yt-dlp
+---
+
 ## Codebase Patterns
 - Python project uses pyproject.toml with setuptools; dev deps in `[project.optional-dependencies]` dev extras
 - Dashboard is in `dashboard/` with `npm run typecheck` as the TS check command (uses tsc)

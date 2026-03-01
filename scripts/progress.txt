@@ -28,3 +28,16 @@ Started: Sat Feb 28 16:03:28 PST 2026
   - The `_skipping` reset after `_play_next` is a safety no-op in cases where the callback never fires (e.g., API-only flow).
   - The pre-existing `auth.py` change (adding `@aiohttp.web.middleware`) required a conftest stub fix — always check for pre-existing working-tree modifications before starting.
 ---
+
+## 2026-02-28 - US-002
+- What was implemented: Updated the skip API to return full queue state (current + tracks) in a single response, enabling the dashboard to update immediately without a follow-up GET /api/queue call. Updated frontend to apply returned state directly.
+- Files changed:
+  - `bot/api/player.py`: `handle_queue_skip` now includes `tracks` field in the JSON response (populated from `queue.list()` after `_play_next` completes)
+  - `dashboard/src/api.ts`: `skipTrack()` changed from `Promise<void>` to `Promise<QueueData>`, parsing `{current, tracks}` from the skip response
+  - `dashboard/src/components/QueueView.tsx`: `handleSkip()` now calls `setQueue(updated)` directly from the skip response instead of calling `loadQueue()` (eliminates a round-trip; state is immediately consistent)
+  - `tests/test_player_api.py`: Four new tests added in `TestHandleQueueSkip` — verify response includes tracks, skip-last-song returns null current + empty tracks, and skip response current matches subsequent GET /api/queue
+- **Learnings for future iterations:**
+  - `handle_queue_skip` already awaited `_play_next` before returning — so `_current_tracks` was always consistent by the time the response was sent. The two-step approach (POST skip → GET queue) was correct but wasteful; returning tracks in the skip response makes it a single round-trip.
+  - `QueueView` has a 5-second polling loop (`setInterval(loadQueue, 5000)`) that handles Discord-triggered skips automatically — no frontend changes needed for AC2 (Discord /skip sync).
+  - The TypeScript build (`npm run build`) runs `tsc -b` then `vite build` — use this to verify both typecheck and bundle.
+---

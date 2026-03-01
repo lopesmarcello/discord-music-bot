@@ -21,7 +21,7 @@
       "id": "US-002",
       "title": "Verify dashboard stays in sync after skip",
       "description": "As a user, the dashboard shows the correct now-playing song and queue immediately after skipping, whether triggered from Discord or the dashboard.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "After dashboard skip: Now Playing updates to next song (or empty if none remain)",
         "After Discord /skip: next 5-second poll reflects correct now-playing track",

@@ -1,10 +1,19 @@
 """Unit tests for AudioResolver."""
 from __future__ import annotations
 
+import io
+import json
+import os
+
 import pytest
 from unittest.mock import MagicMock, patch
 
-from bot.audio.resolver import AudioTrack, AudioResolver, UnsupportedSourceError
+from bot.audio.resolver import (
+    AudioTrack,
+    AudioResolver,
+    UnsupportedSourceError,
+    _parse_iso8601_duration,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -315,7 +324,39 @@ def _make_entry(
     }
 
 
+# ---------------------------------------------------------------------------
+# _parse_iso8601_duration helper
+# ---------------------------------------------------------------------------
+
+
+class TestParseIso8601Duration:
+    def test_minutes_and_seconds(self):
+        assert _parse_iso8601_duration("PT3M45S") == 225
+
+    def test_hours_minutes_seconds(self):
+        assert _parse_iso8601_duration("PT1H2M3S") == 3723
+
+    def test_seconds_only(self):
+        assert _parse_iso8601_duration("PT30S") == 30
+
+    def test_minutes_only(self):
+        assert _parse_iso8601_duration("PT5M") == 300
+
+    def test_hours_only(self):
+        assert _parse_iso8601_duration("PT2H") == 7200
+
+    def test_invalid_returns_zero(self):
+        assert _parse_iso8601_duration("invalid") == 0
+
+
+# ---------------------------------------------------------------------------
+# AudioResolver – search() SoundCloud fallback (no YOUTUBE_API_KEY)
+# ---------------------------------------------------------------------------
+
+
 class TestSearch:
+    """Tests for search() with no YOUTUBE_API_KEY set (SoundCloud fallback)."""
+
     def test_returns_list_of_dicts(self):
         entries = [_make_entry("Song 1"), _make_entry("Song 2")]
         mock_ytdl = _make_ydl_search_class(entries)
@@ -327,27 +368,27 @@ class TestSearch:
     def test_result_has_expected_fields(self):
         entry = _make_entry(
             title="Cool Song",
-            webpage_url="https://youtube.com/watch?v=cool",
+            webpage_url="https://soundcloud.com/artist/cool-song",
             duration=240,
-            thumbnail="https://i.ytimg.com/vi/cool/default.jpg",
+            thumbnail="https://i1.sndcdn.com/artworks/cool.jpg",
         )
         mock_ytdl = _make_ydl_search_class([entry])
         resolver = AudioResolver(ytdl_class=mock_ytdl)
         results = resolver.search("cool song")
         assert results[0] == {
             "title": "Cool Song",
-            "url": "https://youtube.com/watch?v=cool",
+            "url": "https://soundcloud.com/artist/cool-song",
             "duration": 240,
-            "thumbnail": "https://i.ytimg.com/vi/cool/default.jpg",
+            "thumbnail": "https://i1.sndcdn.com/artworks/cool.jpg",
         }
 
-    def test_uses_ytsearch_prefix(self):
+    def test_uses_scsearch_prefix(self):
         mock_ytdl = _make_ydl_search_class([_make_entry()])
         resolver = AudioResolver(ytdl_class=mock_ytdl)
         resolver.search("my query", max_results=5)
         mock_ydl = mock_ytdl.return_value.__enter__.return_value
         call_arg = mock_ydl.extract_info.call_args[0][0]
-        assert call_arg == "ytsearch5:my query"
+        assert call_arg == "scsearch5:my query"
 
     def test_max_results_passed_to_prefix(self):
         mock_ytdl = _make_ydl_search_class([_make_entry()] * 10)
@@ -355,7 +396,7 @@ class TestSearch:
         resolver.search("query", max_results=10)
         mock_ydl = mock_ytdl.return_value.__enter__.return_value
         call_arg = mock_ydl.extract_info.call_args[0][0]
-        assert call_arg.startswith("ytsearch10:")
+        assert call_arg.startswith("scsearch10:")
 
     def test_empty_entries_returns_empty_list(self):
         mock_ytdl = _make_ydl_search_class([])
@@ -372,11 +413,120 @@ class TestSearch:
         assert results == []
 
     def test_missing_optional_fields_use_defaults(self):
-        entry = {"title": "Minimal", "webpage_url": "https://youtube.com/watch?v=m"}
+        entry = {"title": "Minimal", "webpage_url": "https://soundcloud.com/x/y"}
         mock_ytdl = _make_ydl_search_class([entry])
         resolver = AudioResolver(ytdl_class=mock_ytdl)
         results = resolver.search("minimal")
         assert results[0]["duration"] == 0
         assert results[0]["thumbnail"] == ""
+
+
+# ---------------------------------------------------------------------------
+# AudioResolver – search() via YouTube Data API v3
+# ---------------------------------------------------------------------------
+
+
+def _make_http_get_fn(responses: list[dict]) -> MagicMock:
+    """Return a mock _http_get_fn that yields successive JSON responses."""
+    call_count = [0]
+
+    class FakeResp:
+        def __init__(self, data):
+            self._data = json.dumps(data).encode()
+
+        def read(self):
+            return self._data
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    def http_get(url):
+        idx = call_count[0]
+        call_count[0] += 1
+        return FakeResp(responses[idx])
+
+    return http_get
+
+
+def _yt_search_response(video_ids: list[str]) -> dict:
+    """Fake YouTube /search response."""
+    return {
+        "items": [
+            {
+                "id": {"videoId": vid_id},
+                "snippet": {
+                    "title": f"Title {vid_id}",
+                    "thumbnails": {
+                        "high": {"url": f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"}
+                    },
+                },
+            }
+            for vid_id in video_ids
+        ]
+    }
+
+
+def _yt_videos_response(video_ids: list[str], duration="PT3M30S") -> dict:
+    """Fake YouTube /videos?part=contentDetails response."""
+    return {
+        "items": [
+            {"id": vid_id, "contentDetails": {"duration": duration}}
+            for vid_id in video_ids
+        ]
+    }
+
+
+class TestSearchYouTubeApi:
+    """Tests for search() when YOUTUBE_API_KEY is set."""
+
+    def test_uses_youtube_api_when_key_set(self):
+        video_ids = ["abc123"]
+        http_fn = _make_http_get_fn([
+            _yt_search_response(video_ids),
+            _yt_videos_response(video_ids, "PT2M30S"),
+        ])
+        resolver = AudioResolver(_http_get_fn=http_fn)
+        with patch.dict(os.environ, {"YOUTUBE_API_KEY": "test-key"}):
+            results = resolver.search("test query")
+        assert len(results) == 1
+        assert results[0]["title"] == "Title abc123"
+        assert results[0]["url"] == "https://www.youtube.com/watch?v=abc123"
+        assert results[0]["duration"] == 150  # 2*60+30
+        assert results[0]["thumbnail"] == "https://i.ytimg.com/vi/abc123/hqdefault.jpg"
+
+    def test_multiple_results(self):
+        video_ids = ["v1", "v2", "v3"]
+        http_fn = _make_http_get_fn([
+            _yt_search_response(video_ids),
+            _yt_videos_response(video_ids, "PT1M0S"),
+        ])
+        resolver = AudioResolver(_http_get_fn=http_fn)
+        with patch.dict(os.environ, {"YOUTUBE_API_KEY": "key"}):
+            results = resolver.search("query", max_results=3)
+        assert len(results) == 3
+        assert results[1]["url"] == "https://www.youtube.com/watch?v=v2"
+
+    def test_empty_search_response_returns_empty_list(self):
+        http_fn = _make_http_get_fn([{"items": []}])
+        resolver = AudioResolver(_http_get_fn=http_fn)
+        with patch.dict(os.environ, {"YOUTUBE_API_KEY": "key"}):
+            results = resolver.search("nothing here")
+        assert results == []
+
+    def test_falls_back_to_soundcloud_when_youtube_api_raises(self):
+        """If the YouTube API call raises an exception, fall back to SoundCloud."""
+        def bad_http_fn(url):
+            raise OSError("network error")
+
+        entries = [_make_entry("SC Track", webpage_url="https://soundcloud.com/x/y")]
+        mock_ytdl = _make_ydl_search_class(entries)
+        resolver = AudioResolver(ytdl_class=mock_ytdl, _http_get_fn=bad_http_fn)
+        with patch.dict(os.environ, {"YOUTUBE_API_KEY": "key"}):
+            results = resolver.search("test")
+        assert len(results) == 1
+        assert results[0]["title"] == "SC Track"
 
 

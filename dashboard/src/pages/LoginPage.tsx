@@ -9,11 +9,15 @@ export default function LoginPage({ guildId, error }: LoginPageProps) {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>Music Bot Dashboard</h1>
+        <div style={styles.logo}>
+          <MusicNoteIcon />
+          <span style={styles.logoText}>Music Bot</span>
+        </div>
+        <h1 style={styles.title}>Dashboard</h1>
         <p style={styles.subtitle}>Control your Discord music bot from the web</p>
 
         {error && (
-          <div style={styles.error}>
+          <div style={styles.errorBanner}>
             {errorMessage(error)}
           </div>
         )}
@@ -33,6 +37,20 @@ function errorMessage(code: string): string {
     case 'not_in_guild': return 'You are not a member of the required server.';
     default: return 'An error occurred. Please try again.';
   }
+}
+
+function MusicNoteIcon() {
+  return (
+    <svg
+      width="32"
+      height="32"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M9 3v10.55A4 4 0 1 0 11 17V7h4V3H9z" />
+    </svg>
+  );
 }
 
 function DiscordIcon() {
@@ -56,34 +74,46 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    background: 'var(--bg-base)',
   },
   card: {
-    background: 'rgba(255,255,255,0.05)',
-    backdropFilter: 'blur(10px)',
+    background: 'var(--bg-surface)',
+    border: '1px solid var(--border)',
     borderRadius: 16,
     padding: '48px 40px',
     textAlign: 'center',
     maxWidth: 400,
     width: '100%',
     margin: '0 16px',
-    border: '1px solid rgba(255,255,255,0.1)',
+  },
+  logo: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    color: 'var(--accent)',
+    marginBottom: 20,
+  },
+  logoText: {
+    fontSize: 22,
+    fontWeight: 700,
+    color: 'var(--text-primary)',
+    letterSpacing: '-0.5px',
   },
   title: {
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: 28,
     fontWeight: 700,
     margin: '0 0 8px',
   },
   subtitle: {
-    color: 'rgba(255,255,255,0.6)',
+    color: 'var(--text-muted)',
     fontSize: 15,
     margin: '0 0 32px',
   },
-  error: {
-    background: 'rgba(220,53,69,0.2)',
-    border: '1px solid rgba(220,53,69,0.5)',
+  errorBanner: {
+    background: 'rgba(220, 53, 69, 0.15)',
+    border: '1px solid rgba(220, 53, 69, 0.4)',
     borderRadius: 8,
     color: '#ff6b7a',
     padding: '10px 16px',
@@ -93,7 +123,7 @@ const styles: Record<string, React.CSSProperties> = {
   loginButton: {
     display: 'inline-flex',
     alignItems: 'center',
-    background: '#5865f2',
+    background: 'var(--accent)',
     color: '#ffffff',
     textDecoration: 'none',
     padding: '14px 28px',

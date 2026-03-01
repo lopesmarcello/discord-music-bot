@@ -30,7 +30,9 @@ class Music(commands.Cog):
     ) -> None:
         self.bot = bot
         self._resolver = resolver if resolver is not None else AudioResolver()
-        self._queue_registry = queue_registry if queue_registry is not None else GuildQueueRegistry()
+        self._queue_registry = (
+            queue_registry if queue_registry is not None else GuildQueueRegistry()
+        )
         self._ffmpeg_source_class = ffmpeg_source_class
         self._voice_managers: dict[int, VoiceManager] = (
             voice_managers if voice_managers is not None else {}
@@ -97,7 +99,9 @@ class Music(commands.Cog):
         vm.set_on_track_end(self._make_on_track_end(ctx.guild.id))
         await ctx.send(f"Joined **{ctx.author.voice.channel.name}**.")
 
-    @commands.hybrid_command(name="leave", description="Leave the current voice channel")
+    @commands.hybrid_command(
+        name="leave", description="Leave the current voice channel"
+    )
     async def leave(self, ctx: commands.Context) -> None:
         """Leave the voice channel, stop playback, and clear the queue."""
         vm = self._get_voice_manager(ctx.guild.id)
@@ -113,7 +117,9 @@ class Music(commands.Cog):
         await vm.leave()
         await ctx.send("Left the voice channel.")
 
-    @commands.hybrid_command(name="play", description="Play a song by URL or search query")
+    @commands.hybrid_command(
+        name="play", description="Play a song by URL or search query"
+    )
     async def play(self, ctx: commands.Context, *, query: str) -> None:
         """Play a song in the voice channel."""
         await ctx.defer()
@@ -154,7 +160,9 @@ class Music(commands.Cog):
             return
         started_at = self._started_at.get(ctx.guild.id)
         if started_at is not None:
-            self._elapsed_offset[ctx.guild.id] = self._elapsed_offset.get(ctx.guild.id, 0.0) + (time.time() - started_at)
+            self._elapsed_offset[ctx.guild.id] = (
+                self._elapsed_offset.get(ctx.guild.id, 0.0) + (time.time() - started_at)
+            )
             self._started_at[ctx.guild.id] = None
         vm.pause()
         await ctx.send("Paused.")

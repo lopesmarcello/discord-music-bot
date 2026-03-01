@@ -194,7 +194,11 @@ async def handle_playback_get(request: "aiohttp.web.Request") -> "aiohttp.web.Re
     elif state == "playing":
         started_at = music._started_at.get(guild_id)
         offset = music._elapsed_offset.get(guild_id, 0.0)
-        elapsed_seconds = (time.time() - started_at + offset) if started_at is not None else None
+        elapsed_seconds = (
+            (time.time() - started_at + offset)
+            if started_at is not None
+            else None
+        )
     else:  # paused
         elapsed_seconds = music._elapsed_offset.get(guild_id, 0.0)
 
@@ -204,7 +208,9 @@ async def handle_playback_get(request: "aiohttp.web.Request") -> "aiohttp.web.Re
     )
 
 
-async def handle_playback_pause(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
+async def handle_playback_pause(
+    request: "aiohttp.web.Request",
+) -> "aiohttp.web.Response":
     """POST /api/playback/pause?guild_id={id} — pause playback."""
     import time  # noqa: PLC0415
     import aiohttp.web  # noqa: PLC0415
@@ -221,7 +227,9 @@ async def handle_playback_pause(request: "aiohttp.web.Request") -> "aiohttp.web.
 
     started_at = music._started_at.get(guild_id)
     if started_at is not None:
-        music._elapsed_offset[guild_id] = music._elapsed_offset.get(guild_id, 0.0) + (time.time() - started_at)
+        music._elapsed_offset[guild_id] = (
+            music._elapsed_offset.get(guild_id, 0.0) + (time.time() - started_at)
+        )
         music._started_at[guild_id] = None
     vm.pause()
     return aiohttp.web.Response(
@@ -230,7 +238,9 @@ async def handle_playback_pause(request: "aiohttp.web.Request") -> "aiohttp.web.
     )
 
 
-async def handle_playback_resume(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
+async def handle_playback_resume(
+    request: "aiohttp.web.Request",
+) -> "aiohttp.web.Response":
     """POST /api/playback/resume?guild_id={id} — resume playback."""
     import time  # noqa: PLC0415
     import aiohttp.web  # noqa: PLC0415
@@ -253,7 +263,9 @@ async def handle_playback_resume(request: "aiohttp.web.Request") -> "aiohttp.web
     )
 
 
-async def handle_playback_stop(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
+async def handle_playback_stop(
+    request: "aiohttp.web.Request",
+) -> "aiohttp.web.Response":
     """POST /api/playback/stop?guild_id={id} — stop playback and disconnect."""
     import aiohttp.web  # noqa: PLC0415
 

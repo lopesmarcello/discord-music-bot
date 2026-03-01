@@ -1,43 +1,27 @@
-# Ralph Progress Log
-Started: Sat Feb 28 16:03:28 PST 2026
----
-
 ## Codebase Patterns
-- Tests use `PYTHONPATH=/tmp/pypackages:/workspace /usr/bin/python3.11 -m pytest tests/ -x -q` (no pytest in PATH; packages in /tmp/pypackages)
-- `tests/conftest.py` stubs `aiohttp`, `aiohttp.web`, and `jwt` so tests run without real packages installed
-- `mock_web.middleware = lambda fn: fn` — aiohttp.web.middleware decorator must be a pass-through in the stub
-- Music cog per-guild state uses `dict[int, T]` keyed by guild_id; same pattern for `_current_tracks`, `_voice_managers`, `_skipping`
-- Skip race-condition guard: set `_skipping[guild_id] = True` BEFORE `vm.stop()`, clear AFTER `_play_next()` completes
-- `_make_on_track_end` callback runs in discord.py audio thread — GIL protects dict reads/writes for the `_skipping` flag
+- Python tests use stubs in tests/conftest.py (aiohttp.web, jwt) — never need real aiohttp/PyJWT in tests
+- pytest is not installed; use: PYTHONPATH=/tmp/pypackages:/workspace python3.11 -m pytest tests/ -v
+  (first download pip: curl -sL https://bootstrap.pypa.io/pip/pip.pyz -o /tmp/pip.pyz && python3.11 /tmp/pip.pyz install pytest --target /tmp/pypackages)
+- Bot guilds accessed via request.app["bot"].guilds; each guild has .id (int), .name (str), .icon (str|None)
+- Guild IDs are integers on Discord objects but must be serialised as strings in JSON
+- JWT middleware auto-protects all routes not starting with /auth/; new API routes are auto-protected
+- TypeScript typecheck: cd /workspace/dashboard && npm run typecheck
+- New API modules follow pattern: handle_X_get() function + setup_X_routes(app) function
 
+# Ralph Progress Log
+Started: Sat Feb 28 16:27:50 PST 2026
 ---
 
 ## 2026-02-28 - US-001
-- What was implemented: Added `_skipping: dict[int, bool]` flag to the `Music` cog to prevent the `on_track_end` callback from scheduling a second `_play_next` during an explicit skip, eliminating the double-`_play_next` race condition that caused the dashboard to reset to empty state.
+- What was implemented: Added GET /api/guilds endpoint that returns guilds the bot is in
 - Files changed:
-  - `bot/cogs/music.py`: Added `_skipping` attribute; guarded `_make_on_track_end` callback; set/clear flag in `Music.skip`
-  - `bot/api/player.py`: Set/clear `_skipping` flag in `handle_queue_skip`
-  - `bot/api/auth.py`: Staged pre-existing change (moved `@aiohttp.web.middleware` decorator outside inner function)
-  - `tests/conftest.py`: Fixed `mock_web.middleware` to be a pass-through decorator (was MagicMock, broke auth tests)
-  - `tests/integration/test_skip_command.py`: Added tests for flag initialization, flag cleared after skip, and callback no-op when skipping
-  - `tests/test_player_api.py`: Added tests verifying flag is set before vm.stop() and cleared after _play_next
-  - `scripts/prd.json`: Created from `tasks/prd-dashboard-reset-on-skip.md`
-  - `tasks/prd-dashboard-reset-on-skip.md`: Added to repo
+  - bot/api/guilds.py (new): handle_guilds_get() and setup_guilds_routes()
+  - bot/api/server.py: registered guilds routes via setup_guilds_routes()
+  - dashboard/src/api.ts: added Guild interface and fetchGuilds() function
+  - tests/test_guilds_api.py (new): 7 tests covering happy path, empty states, icon=None, string IDs
+  - scripts/prd.json (new): created prd.json for new PRD
 - **Learnings for future iterations:**
-  - The `on_track_end` callback is registered via `vm.set_on_track_end(self._make_on_track_end(guild_id))` only during the Discord `/play` command (when joining voice channel). API-triggered plays do NOT register the callback — so for API-only guilds, `on_track_end` may never fire, and the `_skipping` flag guard in the callback is never invoked.
-  - The `_skipping` reset after `_play_next` is a safety no-op in cases where the callback never fires (e.g., API-only flow).
-  - The pre-existing `auth.py` change (adding `@aiohttp.web.middleware`) required a conftest stub fix — always check for pre-existing working-tree modifications before starting.
----
-
-## 2026-02-28 - US-002
-- What was implemented: Updated the skip API to return full queue state (current + tracks) in a single response, enabling the dashboard to update immediately without a follow-up GET /api/queue call. Updated frontend to apply returned state directly.
-- Files changed:
-  - `bot/api/player.py`: `handle_queue_skip` now includes `tracks` field in the JSON response (populated from `queue.list()` after `_play_next` completes)
-  - `dashboard/src/api.ts`: `skipTrack()` changed from `Promise<void>` to `Promise<QueueData>`, parsing `{current, tracks}` from the skip response
-  - `dashboard/src/components/QueueView.tsx`: `handleSkip()` now calls `setQueue(updated)` directly from the skip response instead of calling `loadQueue()` (eliminates a round-trip; state is immediately consistent)
-  - `tests/test_player_api.py`: Four new tests added in `TestHandleQueueSkip` — verify response includes tracks, skip-last-song returns null current + empty tracks, and skip response current matches subsequent GET /api/queue
-- **Learnings for future iterations:**
-  - `handle_queue_skip` already awaited `_play_next` before returning — so `_current_tracks` was always consistent by the time the response was sent. The two-step approach (POST skip → GET queue) was correct but wasteful; returning tracks in the skip response makes it a single round-trip.
-  - `QueueView` has a 5-second polling loop (`setInterval(loadQueue, 5000)`) that handles Discord-triggered skips automatically — no frontend changes needed for AC2 (Discord /skip sync).
-  - The TypeScript build (`npm run build`) runs `tsc -b` then `vite build` — use this to verify both typecheck and bundle.
+  - pytest is not installed; install to /tmp/pypackages and set PYTHONPATH (see Codebase Patterns above)
+  - The mock_web.Response fake in conftest.py stores text as a string attribute; json.loads(resp.text) is the way to inspect responses
+  - bot.guilds list has guild objects with .id (int), .name, .icon attributes; id must be str() in JSON
 ---

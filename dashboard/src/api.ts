@@ -4,6 +4,12 @@ export interface User {
   avatar: string | null;
 }
 
+export interface Guild {
+  id: string;
+  name: string;
+  icon: string | null;
+}
+
 export interface Track {
   title: string;
   url: string;
@@ -107,4 +113,12 @@ export async function addToQueue(guildId: string, url: string): Promise<void> {
     body: JSON.stringify({ url }),
   });
   if (!res.ok) throw new Error(`Add to queue failed: ${res.status}`);
+}
+
+/** Fetch the list of guilds the bot is in. */
+export async function fetchGuilds(): Promise<Guild[]> {
+  const res = await fetch('/api/guilds');
+  if (!res.ok) throw new Error(`Unexpected status ${res.status}`);
+  const data = await res.json() as { guilds: Guild[] };
+  return data.guilds;
 }

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import TYPE_CHECKING, Optional
 
 import discord
@@ -35,6 +36,9 @@ class Music(commands.Cog):
             voice_managers if voice_managers is not None else {}
         )
         self._current_tracks: dict[int, object] = {}
+        self._skipping: dict[int, bool] = {}
+        self._started_at: dict[int, float | None] = {}
+        self._elapsed_offset: dict[int, float] = {}
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -51,6 +55,9 @@ class Music(commands.Cog):
     def _make_on_track_end(self, guild_id: int):
         """Return a callback that advances the queue when a track finishes."""
         def callback(error: Optional[Exception]) -> None:  # pragma: no cover
+            if self._skipping.get(guild_id, False):
+                self._skipping[guild_id] = False
+                return
             loop = self.bot.loop
             if loop and not loop.is_closed():
                 asyncio.run_coroutine_threadsafe(self._play_next(guild_id), loop)
@@ -62,14 +69,49 @@ class Music(commands.Cog):
         track = queue.next()
         if track is None:
             self._current_tracks[guild_id] = None
+            self._started_at[guild_id] = None
             return
         self._current_tracks[guild_id] = track
+        self._started_at[guild_id] = time.time()
+        self._elapsed_offset[guild_id] = 0.0
         vm = self._get_voice_manager(guild_id)
         await vm.play(track.stream_url)
 
     # ------------------------------------------------------------------
     # Commands
     # ------------------------------------------------------------------
+
+    @commands.hybrid_command(name="join", description="Join your current voice channel")
+    async def join(self, ctx: commands.Context) -> None:
+        """Join the voice channel the user is currently in."""
+        if ctx.author.voice is None:
+            await ctx.send("You must be in a voice channel for me to join.")
+            return
+
+        vm = self._get_voice_manager(ctx.guild.id)
+        if vm.is_connected():
+            await ctx.send("I'm already in a voice channel.")
+            return
+
+        await vm.join(ctx.author.voice.channel)
+        vm.set_on_track_end(self._make_on_track_end(ctx.guild.id))
+        await ctx.send(f"Joined **{ctx.author.voice.channel.name}**.")
+
+    @commands.hybrid_command(name="leave", description="Leave the current voice channel")
+    async def leave(self, ctx: commands.Context) -> None:
+        """Leave the voice channel, stop playback, and clear the queue."""
+        vm = self._get_voice_manager(ctx.guild.id)
+        if not vm.is_connected():
+            await ctx.send("I'm not in a voice channel.")
+            return
+
+        vm.stop()
+        self._started_at[ctx.guild.id] = None
+        self._elapsed_offset[ctx.guild.id] = 0.0
+        self._queue_registry.get_queue(ctx.guild.id).clear()
+        self._current_tracks[ctx.guild.id] = None
+        await vm.leave()
+        await ctx.send("Left the voice channel.")
 
     @commands.hybrid_command(name="play", description="Play a song by URL or search query")
     async def play(self, ctx: commands.Context, *, query: str) -> None:
@@ -110,6 +152,10 @@ class Music(commands.Cog):
         if not vm.is_playing():
             await ctx.send("Nothing is currently playing.")
             return
+        started_at = self._started_at.get(ctx.guild.id)
+        if started_at is not None:
+            self._elapsed_offset[ctx.guild.id] = self._elapsed_offset.get(ctx.guild.id, 0.0) + (time.time() - started_at)
+            self._started_at[ctx.guild.id] = None
         vm.pause()
         await ctx.send("Paused.")
 
@@ -121,6 +167,7 @@ class Music(commands.Cog):
             await ctx.send("Playback is not paused.")
             return
         vm.resume()
+        self._started_at[ctx.guild.id] = time.time()
         await ctx.send("Resumed.")
 
     @commands.hybrid_command(name="skip", description="Skip the current song")
@@ -130,10 +177,12 @@ class Music(commands.Cog):
         if not vm.is_playing() and not vm.is_paused():
             await ctx.send("Nothing to skip.")
             return
+        self._skipping[ctx.guild.id] = True
         vm.stop()
         queue = self._queue_registry.get_queue(ctx.guild.id)
         next_track = queue.peek()
         await self._play_next(ctx.guild.id)
+        self._skipping[ctx.guild.id] = False
         if next_track is not None:
             await ctx.send(f"Skipped. Now playing: **{next_track.title}**")
         else:
@@ -147,6 +196,8 @@ class Music(commands.Cog):
             await ctx.send("I'm not in a voice channel.")
             return
         vm.stop()
+        self._started_at[ctx.guild.id] = None
+        self._elapsed_offset[ctx.guild.id] = 0.0
         queue = self._queue_registry.get_queue(ctx.guild.id)
         queue.clear()
         self._current_tracks[ctx.guild.id] = None

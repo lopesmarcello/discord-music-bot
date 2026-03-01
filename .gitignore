@@ -30,3 +30,9 @@ coverage.xml
 # OS
 .DS_Store
 Thumbs.db
+
+# Agentic Engineering
+./tasks/
+./scripts/prd.json
+./scripts/progress.txt
+./scripts/.last-branch

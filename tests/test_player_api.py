@@ -1,0 +1,876 @@
+"""Tests for US-003: Queue and playback API endpoints."""
+from __future__ import annotations
+
+import asyncio
+import json
+import sys
+import time
+from unittest.mock import AsyncMock, MagicMock
+
+# Shared stubs already injected via tests/conftest.py (aiohttp, jwt).
+from tests.conftest import (
+    FakeApplication,
+    FakeHTTPBadRequest,
+    FakeHTTPException,
+    FakeHTTPServiceUnavailable,
+    FakeResponse,
+)
+
+_mock_web = sys.modules["aiohttp.web"]
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_track(
+    title="Test Track",
+    url="http://example.com/song",
+    duration=180,
+    source="youtube",
+    thumbnail="",
+):
+    track = MagicMock()
+    track.title = title
+    track.url = url
+    track.duration = duration
+    track.source = source
+    track.thumbnail = thumbnail
+    return track
+
+
+def _make_vm(is_playing=False, is_paused=False, is_connected=True):
+    vm = MagicMock()
+    vm.is_playing.return_value = is_playing
+    vm.is_paused.return_value = is_paused
+    vm.is_connected.return_value = is_connected
+    vm.pause = MagicMock()
+    vm.resume = MagicMock()
+    vm.stop = MagicMock()
+    vm.leave = AsyncMock()
+    return vm
+
+
+def _make_queue(tracks=None):
+    q = MagicMock()
+    q.list.return_value = list(tracks) if tracks else []
+    q.clear = MagicMock()
+    return q
+
+
+def _make_music_cog(
+    guild_id=123,
+    current_track=None,
+    queue_tracks=None,
+    vm=None,
+):
+    cog = MagicMock()
+    cog._current_tracks = {}
+    cog._started_at = {}
+    cog._elapsed_offset = {}
+    if current_track is not None:
+        cog._current_tracks[guild_id] = current_track
+
+    fake_queue = _make_queue(queue_tracks)
+    registry = MagicMock()
+    registry.get_queue.return_value = fake_queue
+    cog._queue_registry = registry
+
+    _vm = vm if vm is not None else _make_vm()
+    cog._get_voice_manager = MagicMock(return_value=_vm)
+    cog._play_next = AsyncMock()
+
+    return cog, _vm, fake_queue
+
+
+def _make_bot(music_cog=None):
+    bot = MagicMock()
+    bot.cogs = {}
+    if music_cog is not None:
+        bot.cogs["Music"] = music_cog
+    return bot
+
+
+def _make_request(guild_id=None, app_data=None):
+    """Return a fake aiohttp Request with query params and app dict."""
+    request = MagicMock()
+    if guild_id is not None:
+        request.rel_url.query = {"guild_id": str(guild_id)}
+    else:
+        request.rel_url.query = {}
+
+    # Use a real FakeApplication so app.get() and app[] work correctly.
+    app = FakeApplication()
+    if app_data:
+        for k, v in app_data.items():
+            app[k] = v
+    request.app = app
+    return request
+
+
+# ---------------------------------------------------------------------------
+# setup_player_routes
+# ---------------------------------------------------------------------------
+
+
+class TestSetupPlayerRoutes:
+    def test_registers_all_routes(self):
+        from bot.api.player import setup_player_routes
+
+        app = FakeApplication()
+        setup_player_routes(app)
+        routes = {(method, path) for method, path, _ in app.router.routes}
+        assert ("GET", "/api/queue") in routes
+        assert ("POST", "/api/queue/add") in routes
+        assert ("POST", "/api/queue/skip") in routes
+        assert ("POST", "/api/queue/clear") in routes
+        assert ("GET", "/api/playback") in routes
+        assert ("POST", "/api/playback/pause") in routes
+        assert ("POST", "/api/playback/resume") in routes
+        assert ("POST", "/api/playback/stop") in routes
+
+
+# ---------------------------------------------------------------------------
+# GET /api/queue
+# ---------------------------------------------------------------------------
+
+
+class TestHandleQueueGet:
+    def test_no_bot_returns_empty_queue(self):
+        from bot.api.player import handle_queue_get
+
+        request = _make_request(guild_id=123)
+        resp = asyncio.run(handle_queue_get(request))
+        data = json.loads(resp.text)
+        assert data == {"current": None, "tracks": []}
+
+    def test_empty_queue_and_no_current(self):
+        from bot.api.player import handle_queue_get
+
+        cog, vm, q = _make_music_cog()
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_queue_get(request))
+        data = json.loads(resp.text)
+        assert data["current"] is None
+        assert data["tracks"] == []
+
+    def test_returns_current_track(self):
+        from bot.api.player import handle_queue_get
+
+        track = _make_track("Song A", url="http://example.com/a", duration=120, source="youtube")
+        cog, vm, q = _make_music_cog(guild_id=123, current_track=track)
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_queue_get(request))
+        data = json.loads(resp.text)
+        assert data["current"] == {
+            "title": "Song A",
+            "url": "http://example.com/a",
+            "duration": 120,
+            "source": "youtube",
+            "thumbnail": "",
+        }
+        assert data["tracks"] == []
+
+    def test_returns_queued_tracks(self):
+        from bot.api.player import handle_queue_get
+
+        tracks = [
+            _make_track("Song B", url="http://example.com/b", duration=200, source="youtube"),
+            _make_track("Song C", url="http://example.com/c", duration=300, source="search"),
+        ]
+        cog, vm, q = _make_music_cog(queue_tracks=tracks)
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_queue_get(request))
+        data = json.loads(resp.text)
+        assert len(data["tracks"]) == 2
+        assert data["tracks"][0]["title"] == "Song B"
+        assert data["tracks"][1]["title"] == "Song C"
+
+    def test_missing_guild_id_raises_bad_request(self):
+        from bot.api.player import handle_queue_get
+
+        request = _make_request(guild_id=None)
+        try:
+            asyncio.run(handle_queue_get(request))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
+            pass
+
+    def test_invalid_guild_id_raises_bad_request(self):
+        from bot.api.player import handle_queue_get
+
+        request = MagicMock()
+        request.rel_url.query = {"guild_id": "not-a-number"}
+        request.app = FakeApplication()
+        try:
+            asyncio.run(handle_queue_get(request))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# POST /api/queue/skip
+# ---------------------------------------------------------------------------
+
+
+class TestHandleQueueSkip:
+    def test_skips_and_returns_next_track(self):
+        from bot.api.player import handle_queue_get, handle_queue_skip
+
+        next_track = _make_track("Song Next")
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+
+        # After _play_next is called, simulate it setting current track
+        async def fake_play_next(guild_id):
+            cog._current_tracks[guild_id] = next_track
+
+        cog._play_next.side_effect = fake_play_next
+
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_queue_skip(request))
+        data = json.loads(resp.text)
+        assert data["skipped"] is True
+        assert data["current"]["title"] == "Song Next"
+        vm.stop.assert_called_once()
+        cog._play_next.assert_awaited_once_with(123)
+
+    def test_skips_when_paused(self):
+        from bot.api.player import handle_queue_skip
+
+        vm = _make_vm(is_playing=False, is_paused=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_queue_skip(request))
+        data = json.loads(resp.text)
+        assert data["skipped"] is True
+        vm.stop.assert_called_once()
+
+    def test_skip_when_nothing_playing_raises_bad_request(self):
+        from bot.api.player import handle_queue_skip
+
+        vm = _make_vm(is_playing=False, is_paused=False)
+        cog, _, q = _make_music_cog(vm=vm)
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        try:
+            asyncio.run(handle_queue_skip(request))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
+            pass
+
+    def test_no_bot_raises_service_unavailable(self):
+        from bot.api.player import handle_queue_skip
+
+        request = _make_request(guild_id=123)
+        try:
+            asyncio.run(handle_queue_skip(request))
+            assert False, "expected HTTPServiceUnavailable"
+        except FakeHTTPServiceUnavailable:
+            pass
+
+    def test_skip_queue_empty_returns_null_current(self):
+        from bot.api.player import handle_queue_skip
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        # _play_next sets current to None (empty queue)
+        cog._play_next.side_effect = AsyncMock()
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_queue_skip(request))
+        data = json.loads(resp.text)
+        assert data["skipped"] is True
+        assert data["current"] is None
+
+    def test_skip_sets_skipping_flag_before_stop(self):
+        """handle_queue_skip must set _skipping[guild_id] = True before vm.stop()."""
+        from bot.api.player import handle_queue_skip
+
+        flag_at_stop_time = {}
+
+        vm = _make_vm(is_playing=True)
+
+        def capture_flag_on_stop():
+            flag_at_stop_time["value"] = cog._skipping.get(123, False)
+
+        vm.stop.side_effect = capture_flag_on_stop
+        cog, _, q = _make_music_cog(vm=vm)
+        cog._skipping = {}
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        asyncio.run(handle_queue_skip(request))
+        assert flag_at_stop_time.get("value") is True, "_skipping must be True when vm.stop() is called"
+
+    def test_skip_clears_skipping_flag_after_play_next(self):
+        """handle_queue_skip must clear _skipping[guild_id] after _play_next completes."""
+        from bot.api.player import handle_queue_skip
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        cog._skipping = {}
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        asyncio.run(handle_queue_skip(request))
+        assert cog._skipping.get(123, False) is False, "_skipping must be False after skip completes"
+
+    def test_skip_response_includes_tracks(self):
+        """handle_queue_skip response must include 'tracks' so dashboard can sync immediately."""
+        from bot.api.player import handle_queue_skip
+
+        next_track = _make_track("Next Song")
+        queued_track = _make_track("Queued Song", url="http://example.com/queued")
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+
+        # After _play_next: current track set, one track still in queue
+        async def fake_play_next(guild_id):
+            cog._current_tracks[guild_id] = next_track
+
+        cog._play_next.side_effect = fake_play_next
+        q.list.return_value = [queued_track]
+
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_queue_skip(request))
+        data = json.loads(resp.text)
+        assert "tracks" in data, "skip response must include 'tracks' for immediate dashboard sync"
+        assert isinstance(data["tracks"], list)
+        assert len(data["tracks"]) == 1
+        assert data["tracks"][0]["title"] == "Queued Song"
+
+    def test_skip_last_song_response_has_null_current_and_empty_tracks(self):
+        """Skipping the only playing song returns null current and empty tracks list."""
+        from bot.api.player import handle_queue_skip
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        # _play_next leaves current_tracks[guild_id] unset (empty queue)
+        cog._play_next.side_effect = AsyncMock()
+        q.list.return_value = []
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_queue_skip(request))
+        data = json.loads(resp.text)
+        assert data["skipped"] is True
+        assert data["current"] is None
+        assert data["tracks"] == []
+
+    def test_skip_response_current_matches_queue_get_after_skip(self):
+        """The 'current' in skip response must match what GET /api/queue returns immediately after."""
+        from bot.api.player import handle_queue_get, handle_queue_skip
+
+        next_track = _make_track("Consistent Track", url="http://example.com/consistent")
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+
+        async def fake_play_next(guild_id):
+            cog._current_tracks[guild_id] = next_track
+
+        cog._play_next.side_effect = fake_play_next
+        q.list.return_value = []
+
+        bot = _make_bot(cog)
+        skip_request = _make_request(guild_id=123, app_data={"bot": bot})
+        skip_resp = asyncio.run(handle_queue_skip(skip_request))
+        skip_data = json.loads(skip_resp.text)
+
+        # Now GET /api/queue should return the same current
+        get_request = _make_request(guild_id=123, app_data={"bot": bot})
+        get_resp = asyncio.run(handle_queue_get(get_request))
+        get_data = json.loads(get_resp.text)
+
+        assert skip_data["current"] == get_data["current"], (
+            "skip response 'current' must match subsequent GET /api/queue 'current'"
+        )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/queue/clear
+# ---------------------------------------------------------------------------
+
+
+class TestHandleQueueClear:
+    def test_clears_queue(self):
+        from bot.api.player import handle_queue_clear
+
+        cog, vm, q = _make_music_cog()
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_queue_clear(request))
+        data = json.loads(resp.text)
+        assert data == {"cleared": True}
+        q.clear.assert_called_once()
+
+    def test_no_bot_raises_service_unavailable(self):
+        from bot.api.player import handle_queue_clear
+
+        request = _make_request(guild_id=123)
+        try:
+            asyncio.run(handle_queue_clear(request))
+            assert False, "expected HTTPServiceUnavailable"
+        except FakeHTTPServiceUnavailable:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# POST /api/queue/add
+# ---------------------------------------------------------------------------
+
+
+def _make_request_with_json(guild_id=None, body=None, app_data=None):
+    """Return a fake request with JSON body support."""
+    request = MagicMock()
+    if guild_id is not None:
+        request.rel_url.query = {"guild_id": str(guild_id)}
+    else:
+        request.rel_url.query = {}
+    request.json = AsyncMock(return_value=body if body is not None else {})
+    app = FakeApplication()
+    if app_data:
+        for k, v in app_data.items():
+            app[k] = v
+    request.app = app
+    return request
+
+
+class TestHandleQueueAdd:
+    def test_adds_track_and_starts_playback_when_idle(self):
+        from bot.api.player import handle_queue_add
+
+        track = _make_track("New Song", url="https://youtube.com/watch?v=abc")
+        resolver = MagicMock()
+        resolver.resolve.return_value = track
+
+        vm = _make_vm(is_playing=False, is_paused=False)
+        cog, _, q = _make_music_cog(vm=vm)
+        q.add = MagicMock()
+
+        bot = _make_bot(cog)
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "https://youtube.com/watch?v=abc"},
+            app_data={"bot": bot},
+        )
+        resp = asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+        data = json.loads(resp.text)
+        assert data["added"] is True
+        assert data["track"]["title"] == "New Song"
+        q.add.assert_called_once_with(track)
+        cog._play_next.assert_awaited_once_with(123)
+
+    def test_adds_track_without_starting_playback_when_already_playing(self):
+        from bot.api.player import handle_queue_add
+
+        track = _make_track("Queued Song")
+        resolver = MagicMock()
+        resolver.resolve.return_value = track
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        q.add = MagicMock()
+
+        bot = _make_bot(cog)
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "https://youtube.com/watch?v=xyz"},
+            app_data={"bot": bot},
+        )
+        resp = asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+        data = json.loads(resp.text)
+        assert data["added"] is True
+        q.add.assert_called_once_with(track)
+        cog._play_next.assert_not_awaited()
+
+    def test_adds_track_without_starting_playback_when_paused(self):
+        from bot.api.player import handle_queue_add
+
+        track = _make_track("Paused Song")
+        resolver = MagicMock()
+        resolver.resolve.return_value = track
+
+        vm = _make_vm(is_playing=False, is_paused=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        q.add = MagicMock()
+
+        bot = _make_bot(cog)
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "https://youtube.com/watch?v=paused"},
+            app_data={"bot": bot},
+        )
+        resp = asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+        data = json.loads(resp.text)
+        assert data["added"] is True
+        cog._play_next.assert_not_awaited()
+
+    def test_missing_url_raises_bad_request(self):
+        from bot.api.player import handle_queue_add
+
+        cog, vm, q = _make_music_cog()
+        bot = _make_bot(cog)
+        request = _make_request_with_json(
+            guild_id=123,
+            body={},
+            app_data={"bot": bot},
+        )
+        try:
+            asyncio.run(handle_queue_add(request))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
+            pass
+
+    def test_empty_url_raises_bad_request(self):
+        from bot.api.player import handle_queue_add
+
+        cog, vm, q = _make_music_cog()
+        bot = _make_bot(cog)
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "   "},
+            app_data={"bot": bot},
+        )
+        try:
+            asyncio.run(handle_queue_add(request))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
+            pass
+
+    def test_unsupported_url_raises_bad_request(self):
+        from bot.api.player import handle_queue_add
+        from bot.audio.resolver import UnsupportedSourceError
+
+        resolver = MagicMock()
+        resolver.resolve.side_effect = UnsupportedSourceError("Unsupported URL")
+
+        cog, vm, q = _make_music_cog()
+        bot = _make_bot(cog)
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "https://unsupported.example.com/song"},
+            app_data={"bot": bot},
+        )
+        try:
+            asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
+            pass
+
+    def test_no_bot_raises_service_unavailable(self):
+        from bot.api.player import handle_queue_add
+
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "https://youtube.com/watch?v=abc"},
+        )
+        try:
+            asyncio.run(handle_queue_add(request))
+            assert False, "expected HTTPServiceUnavailable"
+        except FakeHTTPServiceUnavailable:
+            pass
+
+    def test_missing_guild_id_raises_bad_request(self):
+        from bot.api.player import handle_queue_add
+
+        request = _make_request_with_json(
+            guild_id=None,
+            body={"url": "https://youtube.com/watch?v=abc"},
+        )
+        try:
+            asyncio.run(handle_queue_add(request))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# GET /api/playback
+# ---------------------------------------------------------------------------
+
+
+class TestHandlePlaybackGet:
+    def test_no_bot_returns_stopped(self):
+        from bot.api.player import handle_playback_get
+
+        request = _make_request(guild_id=123)
+        resp = asyncio.run(handle_playback_get(request))
+        data = json.loads(resp.text)
+        assert data["state"] == "stopped"
+        assert data["elapsed_seconds"] is None
+
+    def test_returns_playing_state(self):
+        from bot.api.player import handle_playback_get
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        cog._started_at[123] = time.time()
+        cog._elapsed_offset[123] = 0.0
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_playback_get(request))
+        data = json.loads(resp.text)
+        assert data["state"] == "playing"
+        assert isinstance(data["elapsed_seconds"], float)
+        assert data["elapsed_seconds"] >= 0.0
+
+    def test_returns_playing_state_with_offset(self):
+        from bot.api.player import handle_playback_get
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        cog._started_at[123] = time.time()
+        cog._elapsed_offset[123] = 30.0
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_playback_get(request))
+        data = json.loads(resp.text)
+        assert data["state"] == "playing"
+        assert data["elapsed_seconds"] >= 30.0
+
+    def test_returns_playing_state_no_started_at(self):
+        from bot.api.player import handle_playback_get
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        # _started_at not set for this guild — falls back to None
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_playback_get(request))
+        data = json.loads(resp.text)
+        assert data["state"] == "playing"
+        assert data["elapsed_seconds"] is None
+
+    def test_returns_paused_state(self):
+        from bot.api.player import handle_playback_get
+
+        vm = _make_vm(is_playing=False, is_paused=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        cog._elapsed_offset[123] = 45.5
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_playback_get(request))
+        data = json.loads(resp.text)
+        assert data["state"] == "paused"
+        assert data["elapsed_seconds"] == 45.5
+
+    def test_returns_stopped_state(self):
+        from bot.api.player import handle_playback_get
+
+        vm = _make_vm(is_playing=False, is_paused=False)
+        cog, _, q = _make_music_cog(vm=vm)
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_playback_get(request))
+        data = json.loads(resp.text)
+        assert data["state"] == "stopped"
+        assert data["elapsed_seconds"] is None
+
+
+# ---------------------------------------------------------------------------
+# POST /api/playback/pause
+# ---------------------------------------------------------------------------
+
+
+class TestHandlePlaybackPause:
+    def test_pauses_playback(self):
+        from bot.api.player import handle_playback_pause
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_playback_pause(request))
+        data = json.loads(resp.text)
+        assert data == {"paused": True}
+        vm.pause.assert_called_once()
+
+    def test_pause_freezes_elapsed_time(self):
+        from bot.api.player import handle_playback_pause
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        cog._started_at[123] = time.time() - 10.0  # 10 seconds into track
+        cog._elapsed_offset[123] = 0.0
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        asyncio.run(handle_playback_pause(request))
+        # started_at should be cleared and offset should be ~10s
+        assert cog._started_at.get(123) is None
+        assert cog._elapsed_offset.get(123, 0.0) >= 9.0
+
+    def test_pause_with_existing_offset(self):
+        from bot.api.player import handle_playback_pause
+
+        vm = _make_vm(is_playing=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        cog._started_at[123] = time.time() - 5.0
+        cog._elapsed_offset[123] = 20.0  # already accumulated 20s
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        asyncio.run(handle_playback_pause(request))
+        # offset should be ~25s
+        assert cog._elapsed_offset.get(123, 0.0) >= 24.0
+
+    def test_pause_when_not_playing_raises_bad_request(self):
+        from bot.api.player import handle_playback_pause
+
+        vm = _make_vm(is_playing=False)
+        cog, _, q = _make_music_cog(vm=vm)
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        try:
+            asyncio.run(handle_playback_pause(request))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
+            pass
+
+    def test_no_bot_raises_service_unavailable(self):
+        from bot.api.player import handle_playback_pause
+
+        request = _make_request(guild_id=123)
+        try:
+            asyncio.run(handle_playback_pause(request))
+            assert False, "expected HTTPServiceUnavailable"
+        except FakeHTTPServiceUnavailable:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# POST /api/playback/resume
+# ---------------------------------------------------------------------------
+
+
+class TestHandlePlaybackResume:
+    def test_resumes_playback(self):
+        from bot.api.player import handle_playback_resume
+
+        vm = _make_vm(is_paused=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_playback_resume(request))
+        data = json.loads(resp.text)
+        assert data == {"resumed": True}
+        vm.resume.assert_called_once()
+
+    def test_resume_sets_started_at(self):
+        from bot.api.player import handle_playback_resume
+
+        vm = _make_vm(is_paused=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        before = time.time()
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        asyncio.run(handle_playback_resume(request))
+        after = time.time()
+        started_at = cog._started_at.get(123)
+        assert started_at is not None
+        assert before <= started_at <= after
+
+    def test_resume_when_not_paused_raises_bad_request(self):
+        from bot.api.player import handle_playback_resume
+
+        vm = _make_vm(is_paused=False)
+        cog, _, q = _make_music_cog(vm=vm)
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        try:
+            asyncio.run(handle_playback_resume(request))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
+            pass
+
+    def test_no_bot_raises_service_unavailable(self):
+        from bot.api.player import handle_playback_resume
+
+        request = _make_request(guild_id=123)
+        try:
+            asyncio.run(handle_playback_resume(request))
+            assert False, "expected HTTPServiceUnavailable"
+        except FakeHTTPServiceUnavailable:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# POST /api/playback/stop
+# ---------------------------------------------------------------------------
+
+
+class TestHandlePlaybackStop:
+    def test_stops_playback_and_disconnects(self):
+        from bot.api.player import handle_playback_stop
+
+        vm = _make_vm(is_connected=True)
+        cog, _, q = _make_music_cog(vm=vm)
+        cog._started_at[123] = time.time()
+        cog._elapsed_offset[123] = 15.0
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        resp = asyncio.run(handle_playback_stop(request))
+        data = json.loads(resp.text)
+        assert data == {"stopped": True}
+        vm.stop.assert_called_once()
+        q.clear.assert_called_once()
+        assert cog._current_tracks.get(123) is None
+        assert cog._started_at.get(123) is None
+        assert cog._elapsed_offset.get(123) == 0.0
+        vm.leave.assert_awaited_once()
+
+    def test_stop_when_not_connected_raises_bad_request(self):
+        from bot.api.player import handle_playback_stop
+
+        vm = _make_vm(is_connected=False)
+        cog, _, q = _make_music_cog(vm=vm)
+        bot = _make_bot(cog)
+        request = _make_request(guild_id=123, app_data={"bot": bot})
+        try:
+            asyncio.run(handle_playback_stop(request))
+            assert False, "expected HTTPBadRequest"
+        except FakeHTTPBadRequest:
+            pass
+
+    def test_no_bot_raises_service_unavailable(self):
+        from bot.api.player import handle_playback_stop
+
+        request = _make_request(guild_id=123)
+        try:
+            asyncio.run(handle_playback_stop(request))
+            assert False, "expected HTTPServiceUnavailable"
+        except FakeHTTPServiceUnavailable:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# create_app integration: player routes are registered
+# ---------------------------------------------------------------------------
+
+
+class TestCreateAppIncludesPlayerRoutes:
+    def test_player_routes_registered(self):
+        from bot.api.server import create_app
+
+        app = create_app()
+        routes = {(method, path) for method, path, _ in app.router.routes}
+        assert ("GET", "/api/queue") in routes
+        assert ("POST", "/api/queue/skip") in routes
+        assert ("GET", "/api/playback") in routes
+
+    def test_bot_stored_in_app_when_provided(self):
+        from bot.api.server import create_app
+
+        bot = _make_bot()
+        app = create_app(bot=bot)
+        assert app["bot"] is bot
+
+    def test_no_bot_key_when_not_provided(self):
+        from bot.api.server import create_app
+
+        app = create_app()
+        assert app.get("bot") is None

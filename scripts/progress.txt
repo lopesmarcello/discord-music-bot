@@ -1,0 +1,77 @@
+## Codebase Patterns
+- TypeScript typecheck: `cd dashboard && npm run typecheck` (tsc -b --noEmit)
+- Python lint: `ruff check bot/` (not installed in local env; runs in CI only)
+- Python tests: `pytest --tb=short` (not installed in local env; runs in CI only)
+- PRD is a markdown file at `tasks/prd-dashboard-skip-and-guild-fixes.md` (not prd.json)
+- Mark story done by checking `[ ]` → `[x]` in the markdown PRD
+- JWT middleware (`make_jwt_middleware` in `bot/api/auth.py`) decodes the token but does NOT store it on `request` — handlers must decode it themselves if they need payload
+- `skipTrack()` in `api.ts` already returns `QueueData` (`{current, tracks}`) — backend change not needed for US-002
+
+---
+# Ralph Progress Log
+Started: Sun Mar  1 08:33:41 PST 2026
+---
+
+## 2026-03-01 - US-007
+- Auto-select guild when exactly 1 common guild; empty state message for 0 guilds
+- Files changed: `dashboard/src/pages/GuildPickerPage.tsx`
+- **Learnings for future iterations:**
+  - `handleGuildClick` must be defined before the `useEffect` that uses it (moved it up)
+  - Auto-redirect calls `window.location.href` — no need to setGuilds in that branch
+  - 0-guild empty state message should reference user membership, not just "bot not in any servers"
+---
+
+## 2026-03-01 - US-006
+- Added sessionStorage persistence for selected guild in `App.tsx`; clear on logout + navigate to '/'
+- Files changed: `dashboard/src/App.tsx`
+- **Learnings for future iterations:**
+  - `onLogout` in App.tsx was `setAuth({status: 'unauthenticated'})` — changed to clear sessionStorage + `window.location.href = '/'`
+  - sessionStorage helpers `getSessionGuild`/`setSessionGuild` are module-level functions (not inside component) to avoid recreating on render
+  - URL param takes precedence over sessionStorage; sessionStorage is read only when URL param is absent
+---
+
+## 2026-03-01 - US-005
+- Filtered /api/guilds to intersection of bot guilds and JWT guild_ids
+- Files changed: `bot/api/auth.py` (middleware stores jwt_payload on request), `bot/api/guilds.py` (filtering logic)
+- **Learnings for future iterations:**
+  - JWT middleware previously decoded the token but discarded the result — needed to add `request["jwt_payload"] = payload`
+  - In aiohttp, decoded payload is stored on `request` as a dict item (not an attribute), accessed via `request.get("jwt_payload", {})`
+  - Backward-compat: `user_guild_ids = jwt_payload.get("guild_ids")` returns None for old sessions → fall back to all bot guilds
+---
+
+## 2026-03-01 - US-004
+- Added guild_ids to JWT session payload
+- Files changed: `bot/api/auth.py`
+- **Learnings for future iterations:**
+  - `guilds_data` is already available in `handle_auth_callback` from Discord OAuth; no extra API call needed
+  - guild IDs are strings (Discord snowflakes) — `[g["id"] for g in guilds_data]`
+---
+
+## 2026-03-01 - US-003
+- Verified QueueView skip behaviour — no code changes needed
+- `onQueueChanged` → increments `queueRefreshKey` → triggers `loadQueue()` (GET only) in QueueView; no double POST
+- By the time `onQueueChanged` fires, `await skipTrack()` has resolved so backend is stable
+- Files changed: `tasks/prd-dashboard-skip-and-guild-fixes.md` (checked off criteria)
+- **Learnings for future iterations:**
+  - `DashboardPage` wires PlayerBar.onQueueChanged to `setQueueRefreshKey((k) => k + 1)`, which QueueView uses as `refreshTrigger`
+  - `refreshTrigger` in QueueView only calls `loadQueue()` (GET `/api/queue`), never a POST
+---
+
+## 2026-03-01 - US-002
+- Fixed `PlayerBar.handleSkip` to use skip response data, removed `fetchData()` call
+- Files changed: `dashboard/src/components/PlayerBar.tsx`
+- **Learnings for future iterations:**
+  - Pattern: `const updated = await skipTrack(guildId); setCurrentTrack(updated.current);`
+  - Do NOT call `fetchData()` right after skip — let 5s poll correct drift
+  - `onQueueChanged?.()` still called to refresh QueueView via `refreshTrigger`
+---
+
+## 2026-03-01 - US-001
+- Investigated and documented the skip-clearing race condition
+- Files changed: `dashboard/src/components/PlayerBar.tsx` (added race condition comment), `tasks/prd-dashboard-skip-and-guild-fixes.md` (checked off acceptance criteria)
+- **Learnings for future iterations:**
+  - `PlayerBar.handleSkip` discards `skipTrack()` return value and immediately calls `fetchData()` — this is the bug
+  - `bot/api/player.py:handle_queue_skip` awaits `_play_next` before responding, but the Discord VC may still report `is_playing()=False` briefly after `_play_next` returns (async audio setup race)
+  - `QueueView.handleSkip` already does the correct thing: uses skip response directly, no re-fetch
+  - `skipTrack()` in `api.ts` already returns `{current, tracks}` — no backend changes needed for US-002
+---

@@ -12,15 +12,22 @@ export default function GuildPickerPage({ user, onLogout }: GuildPickerPageProps
   const [guilds, setGuilds] = useState<Guild[] | null>(null);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
-    fetchGuilds()
-      .then(data => setGuilds(data))
-      .catch(() => setError(true));
-  }, []);
-
   function handleGuildClick(guildId: string) {
     window.location.href = `/?guild=${encodeURIComponent(guildId)}`;
   }
+
+  useEffect(() => {
+    fetchGuilds()
+      .then(data => {
+        // Auto-select when the user shares exactly one guild with the bot
+        if (data.length === 1) {
+          handleGuildClick(data[0].id);
+        } else {
+          setGuilds(data);
+        }
+      })
+      .catch(() => setError(true));
+  }, []);
 
   return (
     <AppShell user={user} onLogout={onLogout}>
@@ -35,7 +42,7 @@ export default function GuildPickerPage({ user, onLogout }: GuildPickerPageProps
             ))}
           </div>
         ) : guilds.length === 0 ? (
-          <div style={styles.message}>The bot is not in any servers yet.</div>
+          <div style={styles.message}>No common servers found. Make sure the bot is in a server you belong to.</div>
         ) : (
           <div style={styles.grid}>
             {guilds.map(guild => (

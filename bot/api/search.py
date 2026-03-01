@@ -22,7 +22,7 @@ async def handle_search(
     _resolver_factory=None,
 ) -> "aiohttp.web.Response":
     """GET /api/search?q={query}&limit={n} — search YouTube and return results."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     q = request.rel_url.query.get("q", "").strip()
     if not q:
@@ -62,6 +62,6 @@ async def handle_search(
 
 def setup_search_routes(app: "aiohttp.web.Application") -> None:
     """Register search routes on the aiohttp application."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     app.router.add_get("/api/search", handle_search)

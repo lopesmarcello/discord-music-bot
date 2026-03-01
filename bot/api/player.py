@@ -18,7 +18,7 @@ def _get_music_cog(request: "aiohttp.web.Request"):
 
 def _require_guild_id(request: "aiohttp.web.Request") -> int:
     """Parse guild_id from query params, or raise HTTPBadRequest."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id_str = request.rel_url.query.get("guild_id", "")
     if not guild_id_str:
@@ -41,7 +41,7 @@ def _track_dict(track) -> dict:
 
 async def handle_queue_get(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
     """GET /api/queue?guild_id={id} — return current track and upcoming queue."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
     music = _get_music_cog(request)
@@ -67,7 +67,7 @@ async def handle_queue_get(request: "aiohttp.web.Request") -> "aiohttp.web.Respo
 
 async def handle_queue_skip(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
     """POST /api/queue/skip?guild_id={id} — skip the current track."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
     music = _get_music_cog(request)
@@ -99,7 +99,7 @@ async def handle_queue_skip(request: "aiohttp.web.Request") -> "aiohttp.web.Resp
 
 async def handle_queue_clear(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
     """POST /api/queue/clear?guild_id={id} — clear the upcoming queue."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
     music = _get_music_cog(request)
@@ -122,7 +122,7 @@ async def handle_queue_add(
     _resolver_factory=None,
 ) -> "aiohttp.web.Response":
     """POST /api/queue/add?guild_id={id} — add a track by URL to the queue."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
     music = _get_music_cog(request)
@@ -170,7 +170,7 @@ async def handle_queue_add(
 async def handle_playback_get(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
     """GET /api/playback?guild_id={id} — return current playback state."""
     import time  # noqa: PLC0415
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
     music = _get_music_cog(request)
@@ -213,7 +213,7 @@ async def handle_playback_pause(
 ) -> "aiohttp.web.Response":
     """POST /api/playback/pause?guild_id={id} — pause playback."""
     import time  # noqa: PLC0415
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
     music = _get_music_cog(request)
@@ -243,7 +243,7 @@ async def handle_playback_resume(
 ) -> "aiohttp.web.Response":
     """POST /api/playback/resume?guild_id={id} — resume playback."""
     import time  # noqa: PLC0415
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
     music = _get_music_cog(request)
@@ -267,7 +267,7 @@ async def handle_playback_stop(
     request: "aiohttp.web.Request",
 ) -> "aiohttp.web.Response":
     """POST /api/playback/stop?guild_id={id} — stop playback and disconnect."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
     music = _get_music_cog(request)
@@ -295,7 +295,7 @@ async def handle_playback_stop(
 
 def setup_player_routes(app: "aiohttp.web.Application") -> None:
     """Register queue and playback routes on the aiohttp application."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     app.router.add_get("/api/queue", handle_queue_get)
     app.router.add_post("/api/queue/add", handle_queue_add)

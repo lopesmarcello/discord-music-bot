@@ -49,7 +49,7 @@ def decode_jwt(token: str) -> dict:
 
 async def handle_auth_discord(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
     """GET /auth/discord?guild_id={id} — redirect to Discord OAuth2."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = request.rel_url.query.get("guild_id", "")
     client_id = os.environ.get("DISCORD_CLIENT_ID", "")
@@ -125,7 +125,7 @@ async def handle_auth_callback(
     _http_session_factory=None,
 ) -> "aiohttp.web.Response":
     """GET /auth/callback — exchange code, verify guild, issue JWT cookie."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     dashboard_url = os.environ.get("DASHBOARD_URL", "http://localhost:3000")
     code = request.rel_url.query.get("code", "")
@@ -167,7 +167,7 @@ async def handle_auth_callback(
 
 async def handle_auth_me(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
     """GET /auth/me — return {id, username, avatar} or 401."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     token = request.cookies.get(COOKIE_NAME)
     if not token:
@@ -190,7 +190,7 @@ async def handle_auth_me(request: "aiohttp.web.Request") -> "aiohttp.web.Respons
 
 async def handle_auth_logout(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
     """POST /auth/logout — clear the session cookie."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     response = aiohttp.web.Response(text="{}", content_type="application/json")
     response.del_cookie(COOKIE_NAME, path="/")
@@ -203,7 +203,7 @@ async def handle_auth_logout(request: "aiohttp.web.Request") -> "aiohttp.web.Res
 
 def make_jwt_middleware():
     """Return an aiohttp middleware that enforces JWT auth on non-/auth/* routes."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     @aiohttp.web.middleware
     async def _jwt_middleware(request, handler):
@@ -230,7 +230,7 @@ def make_jwt_middleware():
 
 def setup_auth_routes(app: "aiohttp.web.Application") -> None:
     """Register auth routes on the aiohttp application."""
-    import aiohttp.web  # noqa: PLC0415
+    import aiohttp.web  # noqa: PLC0415, F401
 
     app.router.add_get("/auth/discord", handle_auth_discord)
     app.router.add_get("/auth/callback", handle_auth_callback)

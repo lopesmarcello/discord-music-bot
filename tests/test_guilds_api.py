@@ -26,12 +26,14 @@ def _make_guild(guild_id=123, name="Test Guild", icon="abc123"):
     return g
 
 
-def _make_request(bot=None):
+def _make_request(bot=None, jwt_payload=None):
     req = MagicMock()
     app = FakeApplication()
     if bot is not None:
         app["bot"] = bot
     req.app = app
+    _data = {} if jwt_payload is None else {"jwt_payload": jwt_payload}
+    req.get = lambda key, default=None: _data.get(key, default)
     return req
 
 
@@ -67,7 +69,7 @@ class TestHandleGuildsGet:
         g1 = _make_guild(guild_id=111, name="Alpha", icon="hash1")
         g2 = _make_guild(guild_id=222, name="Beta", icon="hash2")
         bot = _make_bot(guilds=[g1, g2])
-        req = _make_request(bot=bot)
+        req = _make_request(bot=bot, jwt_payload={"guild_ids": ["111", "222"]})
         resp = asyncio.run(handle_guilds_get(req))
         data = json.loads(resp.text)
         assert len(data["guilds"]) == 2
@@ -78,7 +80,7 @@ class TestHandleGuildsGet:
         """Guild IDs are serialised as strings (not integers)."""
         g = _make_guild(guild_id=999999999999)
         bot = _make_bot(guilds=[g])
-        req = _make_request(bot=bot)
+        req = _make_request(bot=bot, jwt_payload={"guild_ids": ["999999999999"]})
         resp = asyncio.run(handle_guilds_get(req))
         data = json.loads(resp.text)
         assert isinstance(data["guilds"][0]["id"], str)
@@ -88,7 +90,7 @@ class TestHandleGuildsGet:
         """Icon field is None when guild has no icon."""
         g = _make_guild(icon=None)
         bot = _make_bot(guilds=[g])
-        req = _make_request(bot=bot)
+        req = _make_request(bot=bot, jwt_payload={"guild_ids": ["123"]})
         resp = asyncio.run(handle_guilds_get(req))
         data = json.loads(resp.text)
         assert data["guilds"][0]["icon"] is None

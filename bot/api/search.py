@@ -29,7 +29,7 @@ async def handle_search(
         raise aiohttp.web.HTTPBadRequest(reason="q query parameter is required")
 
     try:
-        limit = int(request.rel_url.query.get("limit", "5"))
+        limit = int(request.rel_url.query.get("limit", "25"))
     except ValueError:
         raise aiohttp.web.HTTPBadRequest(reason="limit must be an integer")
 

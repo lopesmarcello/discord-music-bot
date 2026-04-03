@@ -138,11 +138,8 @@ Navigate to `http://localhost:3000?guild=YOUR_GUILD_ID` (or the dev server URL) 
 ## Running Tests & Linting
 
 ```bash
-# Run all tests
-pytest
-
-# Run with coverage report
-pytest --cov=bot --cov-report=term-missing
+# Run all tests with coverage (CI enforces >= 70%)
+pytest --cov --cov-report=term-missing --cov-fail-under=70
 
 # Run only unit tests
 pytest tests/unit/
@@ -150,11 +147,17 @@ pytest tests/unit/
 # Run only integration tests
 pytest tests/integration/
 
-# Check code style (must pass before committing)
-ruff check bot/
+# Lint check (must pass before committing — covers bot/ and tests/)
+ruff check bot/ tests/
 
-# Auto-fix safe violations
-ruff check --fix bot/
+# Format check (must pass before committing)
+ruff format --check bot/ tests/
+
+# Auto-fix lint violations
+ruff check --fix bot/ tests/
+
+# Auto-format
+ruff format bot/ tests/
 ```
 
 ### Dashboard type-check
@@ -293,22 +296,31 @@ docker compose up -d --build
 
 | Workflow | File | Trigger | Jobs |
 | --- | --- | --- | --- |
-| PR Validation | [`ci.yml`](.github/workflows/ci.yml) | PR → `develop` or `main` | `test-bot` (pytest + ruff), `lint-dashboard` (typecheck) |
-| Deploy Dev | [`deploy-dev.yml`](.github/workflows/deploy-dev.yml) | Manual (`workflow_dispatch`) | SSH deploy to dev server |
-| Deploy Prod | [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) | Manual (`workflow_dispatch`) | SSH deploy to prod server |
+| CI | [`ci.yml`](.github/workflows/ci.yml) | Push to `main` + PRs to `main` | `test-bot` (pytest + coverage + ruff check + ruff format), `lint-dashboard` (typecheck), `build-docker` (build both images) |
+| Deploy | [`deploy.yml`](.github/workflows/deploy.yml) | Manual (`workflow_dispatch`) | Verifies CI passes on `main`, then SSH deploys to selected environment |
 
-Deployments are triggered manually from the **GitHub Actions** tab. They use `appleboy/ssh-action` and run `docker compose pull && docker compose up -d --build` on the target server. Required GitHub Actions secrets:
+### CI checks (all must pass)
 
-| Secret | Used by |
+| Check | Command | Scope |
+| --- | --- | --- |
+| Pytest + coverage | `pytest --cov --cov-fail-under=70` | `tests/` (minimum 70% coverage) |
+| Ruff lint | `ruff check bot/ tests/` | E, F, W rules |
+| Ruff format | `ruff format --check bot/ tests/` | Consistent formatting |
+| TypeScript | `npm run typecheck` | Dashboard types |
+| Docker build | `docker build` | Bot + dashboard images |
+
+### Deploy
+
+Deployments are triggered manually from **GitHub Actions → Deploy → Run workflow**. Select the target environment (development or production). The workflow verifies CI is passing on `main` before deploying.
+
+Required GitHub Actions secrets (configured per environment):
+
+| Secret | Description |
 | --- | --- |
-| `DEV_HOST` | Deploy Dev |
-| `DEV_USER` | Deploy Dev |
-| `DEV_SSH_KEY` | Deploy Dev |
-| `DEV_DEPLOY_PATH` | Deploy Dev |
-| `PROD_HOST` | Deploy Prod |
-| `PROD_USER` | Deploy Prod |
-| `PROD_SSH_KEY` | Deploy Prod |
-| `PROD_DEPLOY_PATH` | Deploy Prod |
+| `DEV_HOST` / `PROD_HOST` | Server hostname or IP |
+| `DEV_USER` / `PROD_USER` | SSH username |
+| `DEV_SSH_KEY` / `PROD_SSH_KEY` | SSH private key |
+| `DEV_DEPLOY_PATH` / `PROD_DEPLOY_PATH` | Path to docker-compose.yml on server |
 
 ---
 
@@ -320,15 +332,17 @@ discord-music-bot/
 │   ├── __main__.py          # Entry point — starts bot + API server
 │   ├── bot.py               # Bot instantiation and cog loading
 │   ├── api/
-│   │   ├── server.py        # aiohttp app factory and startup helper
-│   │   ├── auth.py          # Discord OAuth2 routes and JWT middleware
+│   │   ├── server.py        # aiohttp app factory, health endpoint, startup
+│   │   ├── auth.py          # Discord OAuth2 routes, JWT middleware, guild auth
 │   │   ├── guilds.py        # GET /api/guilds
-│   │   ├── player.py        # Queue and playback routes
+│   │   ├── player.py        # Queue and playback routes (uses MusicService)
 │   │   └── search.py        # GET /api/search
 │   ├── audio/
 │   │   ├── resolver.py      # AudioResolver, AudioTrack, UnsupportedSourceError
 │   │   ├── queue.py         # Queue class (per-guild track list)
 │   │   └── voice.py         # VoiceManager (Discord voice connections)
+│   ├── services/
+│   │   └── music.py         # MusicService — shared playback state facade
 │   └── cogs/
 │       └── music.py         # Music commands cog (/play, /pause, /resume, …)
 ├── dashboard/
@@ -366,6 +380,20 @@ discord-music-bot/
 
 ---
 
+## Health Endpoints
+
+| Endpoint | Description | Auth required |
+| --- | --- | --- |
+| `GET /health` (bot :8080) | Bot health + readiness status | No |
+| `GET /health` (dashboard :3000) | Dashboard nginx health | No |
+| `GET /health/bot` (dashboard :3000) | Bot health proxied through dashboard | No |
+
+Both containers have Docker healthchecks. The dashboard waits for the bot to be healthy before starting.
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution guide, branch naming conventions, PR checklist, and manual deployment instructions.
+
+For AI coding agents (Claude, Copilot, Codex, Cursor, etc.), see [AGENTS.md](AGENTS.md) for architecture decisions, code patterns, testing conventions, and step-by-step guides for common tasks.

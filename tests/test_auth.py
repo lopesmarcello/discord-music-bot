@@ -256,7 +256,11 @@ class TestHandleAuthCallback:
 
     def test_successful_login_jwt_contains_exp_claim(self):
         import pytest
-        req = _make_request(path="/auth/callback", query={"code": "valid_code", "state": "999"})
+
+        req = _make_request(
+            path="/auth/callback",
+            query={"code": "valid_code", "state": "999"},
+        )
         factory = _make_session_factory(
             token_data={"access_token": "discord_token_abc"},
             user_data={"id": "u1", "username": "alice", "avatar": "avatar_hash"},
@@ -272,9 +276,9 @@ class TestHandleAuthCallback:
         with patch.dict("os.environ", env):
             with pytest.raises(FakeHTTPFound) as exc_info:
                 asyncio.run(handle_auth_callback(req, _http_session_factory=factory))
-        token = exc_info.value._cookies.get(COOKIE_NAME)
-        assert token is not None
-        payload = decode_jwt(token)
+            token = exc_info.value._cookies.get(COOKIE_NAME)
+            assert token is not None
+            payload = decode_jwt(token)
         assert "exp" in payload, "JWT must contain an exp claim"
         assert isinstance(payload["exp"], int), "exp must be a unix timestamp integer"
 

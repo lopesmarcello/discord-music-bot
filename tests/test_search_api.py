@@ -138,9 +138,9 @@ class TestHandleSearchWithCog:
         resp = asyncio.run(handle_search(request))
         data = json.loads(resp.text)
         assert data == {"results": results}
-        resolver.search.assert_called_once_with("test query", max_results=5)
+        resolver.search.assert_called_once_with("test query", max_results=25)
 
-    def test_default_limit_is_5(self):
+    def test_default_limit_is_25(self):
         from bot.api.search import handle_search
 
         resolver = _make_resolver([])
@@ -152,7 +152,7 @@ class TestHandleSearchWithCog:
         )
         asyncio.run(handle_search(request))
         _, kwargs = resolver.search.call_args
-        assert kwargs["max_results"] == 5
+        assert kwargs["max_results"] == 25
 
     def test_custom_limit_passed_to_resolver(self):
         from bot.api.search import handle_search

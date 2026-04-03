@@ -1,9 +1,13 @@
 """Bot instantiation and cog loading."""
 
+import logging
 import os
 
 import discord
 from discord.ext import commands
+
+
+_log = logging.getLogger(__name__)
 
 
 def create_bot() -> commands.Bot:
@@ -22,7 +26,7 @@ def create_bot() -> commands.Bot:
     async def on_ready() -> None:
         for guild in bot.guilds:
             await bot.tree.sync(guild=guild)
-        print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+        _log.info("Logged in as %s (ID: %s)", bot.user, bot.user.id)
 
     # Load cogs
     async def setup_hook() -> None:

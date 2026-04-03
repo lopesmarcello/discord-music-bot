@@ -1,4 +1,5 @@
 """Shared music service — single source of truth for playback state."""
+
 from __future__ import annotations
 
 import time

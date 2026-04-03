@@ -42,7 +42,7 @@ Once you can run the project locally, you're ready to contribute.
 
 ## Branch Naming Convention
 
-All branches must be created from `develop`. Use a short, descriptive name with one of these prefixes:
+All branches must be created from `main`. Use a short, descriptive name with one of these prefixes:
 
 | Prefix | Use for |
 | --- | --- |
@@ -91,23 +91,21 @@ Keep the subject line under 72 characters. For larger changes, add a blank line 
 ## Pull Request Process
 
 1. **Fork** the repository to your GitHub account (external contributors only; team members clone directly).
-2. **Create a branch** from `develop`:
+2. **Create a branch** from `main`:
    ```bash
-   git checkout develop
-   git pull origin develop
+   git checkout main
+   git pull origin main
    git checkout -b feat/your-feature-name
    ```
 3. **Make your changes** — keep commits focused and atomic.
 4. **Run all checks locally** before pushing (see [CI Requirements](#ci-requirements)).
-5. **Push your branch** and open a PR targeting `develop`:
+5. **Push your branch** and open a PR targeting `main`:
    ```bash
    git push origin feat/your-feature-name
    ```
 6. **Fill in the PR description** — explain what changed, why, and how to test it.
 7. **Wait for CI** — all checks must pass before review begins.
 8. **Address review feedback** — push additional commits to the same branch; do not force-push after review has started.
-
-> PRs targeting `main` directly will not be accepted. All changes go through `develop` first.
 
 ---
 
@@ -117,9 +115,10 @@ Copy this checklist into your PR description and check off each item before requ
 
 ```markdown
 - [ ] I have read CONTRIBUTING.md
-- [ ] My branch is based on `develop` (not `main`)
-- [ ] All tests pass: `pytest --tb=short`
-- [ ] Linting is clean: `ruff check bot/`
+- [ ] My branch is based on `main`
+- [ ] All tests pass with coverage: `pytest --cov --cov-fail-under=70`
+- [ ] Linting is clean: `ruff check bot/ tests/`
+- [ ] Formatting is clean: `ruff format --check bot/ tests/`
 - [ ] Dashboard typechecks: `cd dashboard && npm run typecheck`
 - [ ] I have added or updated tests for new behaviour
 - [ ] I have updated documentation if public-facing behaviour changed
@@ -131,13 +130,15 @@ Copy this checklist into your PR description and check off each item before requ
 
 ## CI Requirements
 
-Every PR to `develop` or `main` runs the following checks automatically via the [`ci.yml`](.github/workflows/ci.yml) workflow. **All must pass before your PR can be merged:**
+Every push to `main` and every PR to `main` runs the following checks automatically via the [`ci.yml`](.github/workflows/ci.yml) workflow. **All must pass before your PR can be merged:**
 
 | Check | Command | What it validates |
 | --- | --- | --- |
-| Pytest (full suite) | `pytest --tb=short` | Unit tests in `tests/unit/` and integration tests in `tests/integration/` |
-| Ruff linting | `ruff check bot/` | PEP8 compliance (E, F, W rules) and common Python errors |
-| TypeScript typecheck | `npm run typecheck` (in `dashboard/`) | TypeScript types across the entire React dashboard |
+| Pytest + coverage | `pytest --cov --cov-fail-under=70` | Full test suite with minimum 70% code coverage |
+| Ruff lint | `ruff check bot/ tests/` | PEP8 compliance (E, F, W rules) across bot and tests |
+| Ruff format | `ruff format --check bot/ tests/` | Consistent code formatting |
+| TypeScript typecheck | `npm run typecheck` (in `dashboard/`) | TypeScript types across the React dashboard |
+| Docker build | `docker build` (bot + dashboard) | Both container images build successfully |
 
 If any check fails, the PR cannot be merged. Fix the failure and push again — CI reruns automatically.
 
@@ -145,8 +146,9 @@ To run all checks locally before pushing:
 
 ```bash
 # Python
-pytest --tb=short
-ruff check bot/
+pytest --cov --cov-report=term-missing --cov-fail-under=70
+ruff check bot/ tests/
+ruff format --check bot/ tests/
 
 # Dashboard
 cd dashboard
@@ -164,34 +166,28 @@ npm run typecheck
 
 ---
 
-## Internal Team: develop → main Promotion
+## Internal Team: Deployment
 
 > This section is for team members with write access to the repository.
 
-The branch strategy keeps `develop` as the integration branch and `main` as the stable production branch.
+All changes land on `main` via PRs. Deployments are triggered manually from **GitHub Actions → Deploy → Run workflow** with an environment selector (development or production).
 
-**Promotion process:**
+**Deploy process:**
 
-1. Ensure `develop` is green — CI must be passing.
-2. Verify the dev environment looks correct (deploy it manually if needed — see below).
-3. Open a **PR from `develop` to `main`** with a summary of what's being promoted:
-   ```
-   Title: chore: promote develop → main (YYYY-MM-DD)
-   Body: list of changes included since last promotion
-   ```
-4. Get at least one other team member to review the promotion PR.
-5. **Merge** (do not squash — preserve the individual commits for history).
-6. Trigger the production deploy manually: go to **GitHub → Actions → Deploy to Production → Run workflow**.
-7. Monitor the run and confirm the deploy step completes successfully.
+1. Ensure `main` is green — CI must be passing.
+2. Go to **GitHub → Actions → Deploy → Run workflow**.
+3. Select the target environment (development or production).
+4. The workflow verifies CI status on `main` before deploying.
+5. Monitor the run and confirm the deploy step completes successfully.
 
-**Rollback:** If production is broken after a promotion, revert the merge commit on `main` and trigger a new manual deploy:
+**Rollback:** If production is broken after a deploy, revert the offending commit on `main` and trigger a new deploy:
 
 ```bash
-git revert -m 1 <merge-commit-sha>
+git revert <commit-sha>
 git push origin main
 ```
 
-Then re-run the [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) workflow manually from the Actions tab.
+Then re-run the Deploy workflow from the Actions tab targeting production.
 
 ---
 
@@ -229,10 +225,10 @@ Each server also needs a `.env` file in the deploy path with all required variab
 
 ### Branch protection
 
-To enforce CI checks on `develop` and `main`, enable branch protection in **GitHub → Settings → Branches** for each branch:
+To enforce CI checks on `main`, enable branch protection in **GitHub → Settings → Branches**:
 
 - Check **Require status checks to pass before merging**
-- Add `Test Bot (Python 3.11)` and `Lint Dashboard (Node.js 20)` as required status checks
+- Add `Test Bot (Python 3.11)`, `Lint Dashboard (Node.js 20)`, and `Validate Docker Builds` as required status checks
 - Check **Require branches to be up to date before merging**
 
 ---

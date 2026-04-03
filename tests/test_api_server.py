@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 from unittest.mock import patch
@@ -13,8 +14,6 @@ _mock_web = sys.modules["aiohttp.web"]
 _FakeApplication = _mock_web.Application
 _FakeAppRunner = _mock_web.AppRunner
 _FakeTCPSite = _mock_web.TCPSite
-
-import json
 
 from bot.api.server import create_app, handle_health, start_api_server  # noqa: E402
 
@@ -125,6 +124,7 @@ class TestHealthEndpoint:
 
     def test_health_returns_ok_without_bot(self):
         from unittest.mock import MagicMock  # noqa: PLC0415
+
         request = MagicMock()
         request.app = _FakeApplication()
         resp = asyncio.run(handle_health(request))
@@ -134,6 +134,7 @@ class TestHealthEndpoint:
 
     def test_health_returns_bot_ready_when_bot_present(self):
         from unittest.mock import MagicMock  # noqa: PLC0415
+
         bot = MagicMock()
         bot.is_ready.return_value = True
         request = MagicMock()

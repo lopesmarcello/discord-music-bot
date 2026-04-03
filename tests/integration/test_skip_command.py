@@ -170,14 +170,14 @@ class TestSkipCommand:
         cog, vm = _make_cog_with_vm(vc, registry)
         ctx = _make_ctx()
         asyncio.run(cog.skip(ctx))
-        assert cog._skipping.get(GUILD_ID, False) is False
+        assert cog.service.skipping.get(GUILD_ID, False) is False
 
     def test_skipping_flag_initialized_empty(self):
         """_skipping dict starts empty."""
         bot = MagicMock()
         bot.loop = asyncio.new_event_loop()
         cog = Music(bot)
-        assert cog._skipping == {}
+        assert cog.service.skipping == {}
 
     def test_on_track_end_skips_play_next_when_skipping_flag_set(self):
         """_make_on_track_end callback does NOT schedule _play_next
@@ -185,14 +185,16 @@ class TestSkipCommand:
         bot = MagicMock()
         bot.loop = asyncio.new_event_loop()
         cog = Music(bot)
-        cog._skipping[GUILD_ID] = True
+        cog.service.skipping[GUILD_ID] = True
         scheduled_coroutines = []
 
         def capture(coro, loop):
             scheduled_coroutines.append(coro)
             return MagicMock()
 
-        callback = cog._make_on_track_end(GUILD_ID)
+        callback = cog._make_on_track_end(
+            GUILD_ID
+        )  # _make_on_track_end stays on the cog
         # Patch run_coroutine_threadsafe to detect scheduling
         import unittest.mock as mock
 
@@ -202,4 +204,4 @@ class TestSkipCommand:
         assert len(scheduled_coroutines) == 0, (
             "_play_next must NOT be scheduled during skip"
         )
-        assert cog._skipping.get(GUILD_ID, True) is False, "flag must be cleared"
+        assert cog.service.skipping.get(GUILD_ID, True) is False, "flag must be cleared"

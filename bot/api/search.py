@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import aiohttp.web
@@ -40,14 +43,15 @@ async def handle_search(
     else:
         music = _get_music_cog(request)
         if music is not None:
-            resolver = music._resolver
+            resolver = music.service.resolver
         else:
             from bot.audio.resolver import AudioResolver  # noqa: PLC0415
             resolver = AudioResolver()
 
     try:
         results = resolver.search(q, max_results=limit)
-    except Exception:
+    except Exception as exc:
+        _log.warning("Search failed for query %r: %s", q, exc)
         return aiohttp.web.Response(
             text=json.dumps({"error": "Search unavailable"}),
             content_type="application/json",

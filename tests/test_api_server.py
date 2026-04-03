@@ -13,7 +13,9 @@ _FakeApplication = _mock_web.Application
 _FakeAppRunner = _mock_web.AppRunner
 _FakeTCPSite = _mock_web.TCPSite
 
-from bot.api.server import create_app, start_api_server  # noqa: E402
+import json
+
+from bot.api.server import create_app, handle_health, start_api_server  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -109,3 +111,32 @@ class TestApiPortEnvVar:
         with patch.dict(os.environ, {"API_PORT": "9999"}):
             port = int(os.getenv("API_PORT", "8080"))
         assert port == 9999
+
+
+class TestHealthEndpoint:
+    def test_health_route_registered(self):
+        app = create_app()
+        routes = {(method, path) for method, path, _ in app.router.routes}
+        assert ("GET", "/health") in routes
+
+    def test_health_returns_ok_without_bot(self):
+        from unittest.mock import MagicMock  # noqa: PLC0415
+        request = MagicMock()
+        request.app = _FakeApplication()
+        resp = asyncio.run(handle_health(request))
+        data = json.loads(resp.text)
+        assert data["status"] == "ok"
+        assert data["bot_ready"] is False
+
+    def test_health_returns_bot_ready_when_bot_present(self):
+        from unittest.mock import MagicMock  # noqa: PLC0415
+        bot = MagicMock()
+        bot.is_ready.return_value = True
+        request = MagicMock()
+        app = _FakeApplication()
+        app["bot"] = bot
+        request.app = app
+        resp = asyncio.run(handle_health(request))
+        data = json.loads(resp.text)
+        assert data["status"] == "ok"
+        assert data["bot_ready"] is True

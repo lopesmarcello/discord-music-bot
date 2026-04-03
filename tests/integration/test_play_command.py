@@ -113,7 +113,7 @@ class TestPlayBotJoinsChannel:
         vc = _make_vc()
         ctx = _make_ctx(vc=vc)
         asyncio.run(cog.play(ctx, query="test song"))
-        vm = cog._get_voice_manager(GUILD_ID)
+        vm = cog.service.get_voice_manager(GUILD_ID)
         assert vm._on_track_end is not None
 
     def test_bot_does_not_rejoin_when_already_connected(self):
@@ -176,7 +176,7 @@ class TestPlayQueueBehaviour:
         # vc.play should NOT be called (already playing)
         vc.play.assert_not_called()
         # Track should remain in the queue (not popped)
-        queue = cog._queue_registry.get_queue(GUILD_ID)
+        queue = cog.service.queue_registry.get_queue(GUILD_ID)
         assert len(queue.list()) == 1
         assert queue.list()[0] is track
 
@@ -188,7 +188,7 @@ class TestPlayQueueBehaviour:
         asyncio.run(cog.play(ctx, query="test song"))
         # vc.play should NOT be called (paused = track in progress)
         vc.play.assert_not_called()
-        queue = cog._queue_registry.get_queue(GUILD_ID)
+        queue = cog.service.queue_registry.get_queue(GUILD_ID)
         assert len(queue.list()) == 1
 
     def test_second_track_queued_when_first_playing(self):
@@ -215,7 +215,7 @@ class TestPlayQueueBehaviour:
         asyncio.run(cog.play(ctx, query="song 2"))
         assert vc.play.call_count == 1  # still only 1 call
 
-        queue = cog._queue_registry.get_queue(GUILD_ID)
+        queue = cog.service.queue_registry.get_queue(GUILD_ID)
         assert len(queue.list()) == 1
         assert queue.list()[0] is track2
 
@@ -226,7 +226,7 @@ class TestPlayQueueBehaviour:
         ctx = _make_ctx(vc=vc)
         asyncio.run(cog.play(ctx, query="test song"))
         # Track was popped from queue to play
-        queue = cog._queue_registry.get_queue(GUILD_ID)
+        queue = cog.service.queue_registry.get_queue(GUILD_ID)
         assert len(queue.list()) == 0
 
 
@@ -299,5 +299,5 @@ class TestPlayUnsupportedUrl:
         cog = Music(bot, resolver=mock_resolver)
         ctx = _make_ctx()
         asyncio.run(cog.play(ctx, query="https://open.spotify.com/track/abc"))
-        queue = cog._queue_registry.get_queue(GUILD_ID)
+        queue = cog.service.queue_registry.get_queue(GUILD_ID)
         assert len(queue.list()) == 0

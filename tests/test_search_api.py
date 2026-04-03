@@ -30,7 +30,9 @@ def _make_resolver(results=None):
 
 def _make_music_cog(resolver=None):
     cog = MagicMock()
-    cog._resolver = resolver if resolver is not None else _make_resolver()
+    svc = MagicMock()
+    svc.resolver = resolver if resolver is not None else _make_resolver()
+    cog.service = svc
     return cog
 
 

@@ -7,6 +7,20 @@ if TYPE_CHECKING:
     import aiohttp.web
 
 
+async def handle_health(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
+    """GET /health — lightweight health check for container orchestration."""
+    import aiohttp.web  # noqa: PLC0415
+
+    bot = request.app.get("bot")
+    bot_ready = bot is not None and bot.is_ready() if bot is not None else False
+
+    import json  # noqa: PLC0415
+    return aiohttp.web.Response(
+        text=json.dumps({"status": "ok", "bot_ready": bot_ready}),
+        content_type="application/json",
+    )
+
+
 def create_app(bot=None) -> "aiohttp.web.Application":
     """Create and return the aiohttp web application.
 
@@ -20,6 +34,7 @@ def create_app(bot=None) -> "aiohttp.web.Application":
     from bot.api.search import setup_search_routes  # noqa: PLC0415
 
     app = aiohttp.web.Application(middlewares=[make_jwt_middleware()])
+    app.router.add_get("/health", handle_health)
     if bot is not None:
         app["bot"] = bot
     setup_auth_routes(app)

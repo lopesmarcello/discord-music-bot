@@ -40,7 +40,7 @@ async def handle_search(
     else:
         music = _get_music_cog(request)
         if music is not None:
-            resolver = music._resolver
+            resolver = music.service.resolver
         else:
             from bot.audio.resolver import AudioResolver  # noqa: PLC0415
             resolver = AudioResolver()

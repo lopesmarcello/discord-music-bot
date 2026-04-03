@@ -72,7 +72,7 @@ class TestQueueCommand:
         """When a track is currently playing, an embed is sent."""
         vc = _make_vc(playing=True)
         cog, vm = _make_cog_with_vm(vc)
-        cog._current_tracks[GUILD_ID] = _make_track(title="Playing Song")
+        cog.service.current_tracks[GUILD_ID] = _make_track(title="Playing Song")
         ctx = _make_ctx()
         asyncio.run(cog.queue(ctx))
         call_kwargs = ctx.send.call_args[1]
@@ -82,7 +82,7 @@ class TestQueueCommand:
         """Currently playing track is shown with 'Now Playing' label."""
         vc = _make_vc(playing=True)
         cog, vm = _make_cog_with_vm(vc)
-        cog._current_tracks[GUILD_ID] = _make_track(title="My Favorite Song")
+        cog.service.current_tracks[GUILD_ID] = _make_track(title="My Favorite Song")
         ctx = _make_ctx()
         asyncio.run(cog.queue(ctx))
         embed = ctx.send.call_args[1]["embed"]
@@ -158,7 +158,7 @@ class TestQueueCommand:
         """Only current track, no queued tracks → embed with Now Playing, no Up Next."""
         vc = _make_vc(playing=True)
         cog, vm = _make_cog_with_vm(vc)
-        cog._current_tracks[GUILD_ID] = _make_track(title="Solo Song")
+        cog.service.current_tracks[GUILD_ID] = _make_track(title="Solo Song")
         ctx = _make_ctx()
         asyncio.run(cog.queue(ctx))
         embed = ctx.send.call_args[1]["embed"]

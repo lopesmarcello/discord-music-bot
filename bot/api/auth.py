@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.parse
+from datetime import datetime, timezone, timedelta
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -157,6 +158,7 @@ async def handle_auth_callback(
         "avatar": user_data.get("avatar"),
         "guild_id": guild_id,
         "guild_ids": [g["id"] for g in guilds_data],
+        "exp": int((datetime.now(timezone.utc) + timedelta(hours=24)).timestamp()),
     }
     token = encode_jwt(session_payload)
 
@@ -208,7 +210,7 @@ def make_jwt_middleware():
 
     @aiohttp.web.middleware
     async def _jwt_middleware(request, handler):
-        if request.path.startswith("/auth/"):
+        if request.path.startswith("/auth/") or request.path == "/health":
             return await handler(request)
 
         token = request.cookies.get(COOKIE_NAME)

@@ -59,28 +59,43 @@ def _make_queue(tracks=None):
     return q
 
 
+def _make_service(
+    guild_id=123,
+    current_track=None,
+    queue_tracks=None,
+    vm=None,
+):
+    """Create a mock MusicService with the given state."""
+    svc = MagicMock()
+    svc.current_tracks = {}
+    svc.started_at = {}
+    svc.elapsed_offset = {}
+    svc.skipping = {}
+    if current_track is not None:
+        svc.current_tracks[guild_id] = current_track
+
+    fake_queue = _make_queue(queue_tracks)
+    registry = MagicMock()
+    registry.get_queue.return_value = fake_queue
+    svc.queue_registry = registry
+
+    _vm = vm if vm is not None else _make_vm()
+    svc.get_voice_manager = MagicMock(return_value=_vm)
+    svc.play_next = AsyncMock()
+
+    return svc, _vm, fake_queue
+
+
 def _make_music_cog(
     guild_id=123,
     current_track=None,
     queue_tracks=None,
     vm=None,
 ):
+    """Create a mock Music cog with a mock service."""
+    svc, _vm, fake_queue = _make_service(guild_id, current_track, queue_tracks, vm)
     cog = MagicMock()
-    cog._current_tracks = {}
-    cog._started_at = {}
-    cog._elapsed_offset = {}
-    if current_track is not None:
-        cog._current_tracks[guild_id] = current_track
-
-    fake_queue = _make_queue(queue_tracks)
-    registry = MagicMock()
-    registry.get_queue.return_value = fake_queue
-    cog._queue_registry = registry
-
-    _vm = vm if vm is not None else _make_vm()
-    cog._get_voice_manager = MagicMock(return_value=_vm)
-    cog._play_next = AsyncMock()
-
+    cog.service = svc
     return cog, _vm, fake_queue
 
 
@@ -225,12 +240,13 @@ class TestHandleQueueSkip:
         next_track = _make_track("Song Next")
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
+        svc = cog.service
 
-        # After _play_next is called, simulate it setting current track
+        # After play_next is called, simulate it setting current track
         async def fake_play_next(guild_id):
-            cog._current_tracks[guild_id] = next_track
+            svc.current_tracks[guild_id] = next_track
 
-        cog._play_next.side_effect = fake_play_next
+        svc.play_next.side_effect = fake_play_next
 
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
@@ -239,7 +255,7 @@ class TestHandleQueueSkip:
         assert data["skipped"] is True
         assert data["current"]["title"] == "Song Next"
         vm.stop.assert_called_once()
-        cog._play_next.assert_awaited_once_with(123)
+        svc.play_next.assert_awaited_once_with(123)
 
     def test_skips_when_paused(self):
         from bot.api.player import handle_queue_skip
@@ -281,8 +297,8 @@ class TestHandleQueueSkip:
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        # _play_next sets current to None (empty queue)
-        cog._play_next.side_effect = AsyncMock()
+        # play_next sets current to None (empty queue)
+        cog.service.play_next.side_effect = AsyncMock()
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_queue_skip(request))
@@ -291,7 +307,7 @@ class TestHandleQueueSkip:
         assert data["current"] is None
 
     def test_skip_sets_skipping_flag_before_stop(self):
-        """handle_queue_skip must set _skipping[guild_id] = True before vm.stop()."""
+        """handle_queue_skip must set skipping[guild_id] = True before vm.stop()."""
         from bot.api.player import handle_queue_skip
 
         flag_at_stop_time = {}
@@ -299,27 +315,29 @@ class TestHandleQueueSkip:
         vm = _make_vm(is_playing=True)
 
         def capture_flag_on_stop():
-            flag_at_stop_time["value"] = cog._skipping.get(123, False)
+            flag_at_stop_time["value"] = svc.skipping.get(123, False)
 
         vm.stop.side_effect = capture_flag_on_stop
         cog, _, q = _make_music_cog(vm=vm)
-        cog._skipping = {}
+        svc = cog.service
+        svc.skipping = {}
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
         asyncio.run(handle_queue_skip(request))
-        assert flag_at_stop_time.get("value") is True, "_skipping must be True when vm.stop() is called"
+        assert flag_at_stop_time.get("value") is True, "skipping must be True when vm.stop() is called"
 
     def test_skip_clears_skipping_flag_after_play_next(self):
-        """handle_queue_skip must clear _skipping[guild_id] after _play_next completes."""
+        """handle_queue_skip must clear skipping[guild_id] after play_next completes."""
         from bot.api.player import handle_queue_skip
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        cog._skipping = {}
+        svc = cog.service
+        svc.skipping = {}
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
         asyncio.run(handle_queue_skip(request))
-        assert cog._skipping.get(123, False) is False, "_skipping must be False after skip completes"
+        assert svc.skipping.get(123, False) is False, "skipping must be False after skip completes"
 
     def test_skip_response_includes_tracks(self):
         """handle_queue_skip response must include 'tracks' so dashboard can sync immediately."""
@@ -329,12 +347,13 @@ class TestHandleQueueSkip:
         queued_track = _make_track("Queued Song", url="http://example.com/queued")
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
+        svc = cog.service
 
-        # After _play_next: current track set, one track still in queue
+        # After play_next: current track set, one track still in queue
         async def fake_play_next(guild_id):
-            cog._current_tracks[guild_id] = next_track
+            svc.current_tracks[guild_id] = next_track
 
-        cog._play_next.side_effect = fake_play_next
+        svc.play_next.side_effect = fake_play_next
         q.list.return_value = [queued_track]
 
         bot = _make_bot(cog)
@@ -352,8 +371,8 @@ class TestHandleQueueSkip:
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        # _play_next leaves current_tracks[guild_id] unset (empty queue)
-        cog._play_next.side_effect = AsyncMock()
+        # play_next leaves current_tracks[guild_id] unset (empty queue)
+        cog.service.play_next.side_effect = AsyncMock()
         q.list.return_value = []
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
@@ -370,11 +389,12 @@ class TestHandleQueueSkip:
         next_track = _make_track("Consistent Track", url="http://example.com/consistent")
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
+        svc = cog.service
 
         async def fake_play_next(guild_id):
-            cog._current_tracks[guild_id] = next_track
+            svc.current_tracks[guild_id] = next_track
 
-        cog._play_next.side_effect = fake_play_next
+        svc.play_next.side_effect = fake_play_next
         q.list.return_value = []
 
         bot = _make_bot(cog)
@@ -464,7 +484,7 @@ class TestHandleQueueAdd:
         assert data["added"] is True
         assert data["track"]["title"] == "New Song"
         q.add.assert_called_once_with(track)
-        cog._play_next.assert_awaited_once_with(123)
+        cog.service.play_next.assert_awaited_once_with(123)
 
     def test_adds_track_without_starting_playback_when_already_playing(self):
         from bot.api.player import handle_queue_add
@@ -487,7 +507,7 @@ class TestHandleQueueAdd:
         data = json.loads(resp.text)
         assert data["added"] is True
         q.add.assert_called_once_with(track)
-        cog._play_next.assert_not_awaited()
+        cog.service.play_next.assert_not_awaited()
 
     def test_adds_track_without_starting_playback_when_paused(self):
         from bot.api.player import handle_queue_add
@@ -509,7 +529,7 @@ class TestHandleQueueAdd:
         resp = asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
         data = json.loads(resp.text)
         assert data["added"] is True
-        cog._play_next.assert_not_awaited()
+        cog.service.play_next.assert_not_awaited()
 
     def test_missing_url_raises_bad_request(self):
         from bot.api.player import handle_queue_add
@@ -610,8 +630,8 @@ class TestHandlePlaybackGet:
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        cog._started_at[123] = time.time()
-        cog._elapsed_offset[123] = 0.0
+        cog.service.started_at[123] = time.time()
+        cog.service.elapsed_offset[123] = 0.0
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_get(request))
@@ -625,8 +645,8 @@ class TestHandlePlaybackGet:
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        cog._started_at[123] = time.time()
-        cog._elapsed_offset[123] = 30.0
+        cog.service.started_at[123] = time.time()
+        cog.service.elapsed_offset[123] = 30.0
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_get(request))
@@ -639,7 +659,7 @@ class TestHandlePlaybackGet:
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        # _started_at not set for this guild — falls back to None
+        # started_at not set for this guild — falls back to None
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_get(request))
@@ -652,7 +672,7 @@ class TestHandlePlaybackGet:
 
         vm = _make_vm(is_playing=False, is_paused=True)
         cog, _, q = _make_music_cog(vm=vm)
-        cog._elapsed_offset[123] = 45.5
+        cog.service.elapsed_offset[123] = 45.5
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_get(request))
@@ -696,27 +716,27 @@ class TestHandlePlaybackPause:
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        cog._started_at[123] = time.time() - 10.0  # 10 seconds into track
-        cog._elapsed_offset[123] = 0.0
+        cog.service.started_at[123] = time.time() - 10.0  # 10 seconds into track
+        cog.service.elapsed_offset[123] = 0.0
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
         asyncio.run(handle_playback_pause(request))
         # started_at should be cleared and offset should be ~10s
-        assert cog._started_at.get(123) is None
-        assert cog._elapsed_offset.get(123, 0.0) >= 9.0
+        assert cog.service.started_at.get(123) is None
+        assert cog.service.elapsed_offset.get(123, 0.0) >= 9.0
 
     def test_pause_with_existing_offset(self):
         from bot.api.player import handle_playback_pause
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        cog._started_at[123] = time.time() - 5.0
-        cog._elapsed_offset[123] = 20.0  # already accumulated 20s
+        cog.service.started_at[123] = time.time() - 5.0
+        cog.service.elapsed_offset[123] = 20.0  # already accumulated 20s
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
         asyncio.run(handle_playback_pause(request))
         # offset should be ~25s
-        assert cog._elapsed_offset.get(123, 0.0) >= 24.0
+        assert cog.service.elapsed_offset.get(123, 0.0) >= 24.0
 
     def test_pause_when_not_playing_raises_bad_request(self):
         from bot.api.player import handle_playback_pause
@@ -770,7 +790,7 @@ class TestHandlePlaybackResume:
         request = _make_request(guild_id=123, app_data={"bot": bot})
         asyncio.run(handle_playback_resume(request))
         after = time.time()
-        started_at = cog._started_at.get(123)
+        started_at = cog.service.started_at.get(123)
         assert started_at is not None
         assert before <= started_at <= after
 
@@ -809,8 +829,8 @@ class TestHandlePlaybackStop:
 
         vm = _make_vm(is_connected=True)
         cog, _, q = _make_music_cog(vm=vm)
-        cog._started_at[123] = time.time()
-        cog._elapsed_offset[123] = 15.0
+        cog.service.started_at[123] = time.time()
+        cog.service.elapsed_offset[123] = 15.0
         bot = _make_bot(cog)
         request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_stop(request))
@@ -818,9 +838,9 @@ class TestHandlePlaybackStop:
         assert data == {"stopped": True}
         vm.stop.assert_called_once()
         q.clear.assert_called_once()
-        assert cog._current_tracks.get(123) is None
-        assert cog._started_at.get(123) is None
-        assert cog._elapsed_offset.get(123) == 0.0
+        assert cog.service.current_tracks.get(123) is None
+        assert cog.service.started_at.get(123) is None
+        assert cog.service.elapsed_offset.get(123) == 0.0
         vm.leave.assert_awaited_once()
 
     def test_stop_when_not_connected_raises_bad_request(self):

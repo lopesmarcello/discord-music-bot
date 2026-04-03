@@ -235,6 +235,30 @@ class TestHandleAuthCallback:
                 asyncio.run(handle_auth_callback(req, _http_session_factory=factory))
         assert "error=invalid_code" in exc_info.value.location
 
+    def test_successful_login_jwt_contains_exp_claim(self):
+        import pytest
+        req = _make_request(path="/auth/callback", query={"code": "valid_code", "state": "999"})
+        factory = _make_session_factory(
+            token_data={"access_token": "discord_token_abc"},
+            user_data={"id": "u1", "username": "alice", "avatar": "avatar_hash"},
+            guilds_data=[{"id": "999", "name": "My Server"}],
+        )
+        env = {
+            "JWT_SECRET": "secret",
+            "DISCORD_CLIENT_ID": "cid",
+            "DISCORD_CLIENT_SECRET": "csecret",
+            "DISCORD_REDIRECT_URI": "http://localhost:3000/auth/callback",
+            "DASHBOARD_URL": "http://localhost:3000",
+        }
+        with patch.dict("os.environ", env):
+            with pytest.raises(FakeHTTPFound) as exc_info:
+                asyncio.run(handle_auth_callback(req, _http_session_factory=factory))
+        token = exc_info.value._cookies.get(COOKIE_NAME)
+        assert token is not None
+        payload = decode_jwt(token)
+        assert "exp" in payload, "JWT must contain an exp claim"
+        assert isinstance(payload["exp"], int), "exp must be a unix timestamp integer"
+
     def test_successful_redirect_contains_guild_id(self):
         import pytest
         req = _make_request(path="/auth/callback", query={"code": "valid_code", "state": "42"})
@@ -325,6 +349,11 @@ class TestJwtMiddleware:
 
     def test_auth_callback_passes_through(self):
         req = _make_request(path="/auth/callback")
+        response = self._run_middleware(req)
+        assert response.text == "ok"
+
+    def test_health_path_passes_through(self):
+        req = _make_request(path="/health")
         response = self._run_middleware(req)
         assert response.text == "ok"
 

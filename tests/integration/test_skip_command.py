@@ -1,4 +1,5 @@
 """Integration tests for skip command (US-007)."""
+
 from __future__ import annotations
 
 import asyncio
@@ -14,6 +15,7 @@ GUILD_ID = 42
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_vc(playing=False, paused=False):
     """Return a mock discord.VoiceClient."""
@@ -43,20 +45,29 @@ def _make_cog_with_vm(vc, queue_registry=None):
     bot.loop = asyncio.new_event_loop()
     ffmpeg = MagicMock()
     from bot.audio.voice import VoiceManager
+
     vm = VoiceManager(ffmpeg_source_class=ffmpeg)
     vm._voice_client = vc
     registry = queue_registry if queue_registry is not None else GuildQueueRegistry()
-    cog = Music(bot, ffmpeg_source_class=ffmpeg, voice_managers={GUILD_ID: vm}, queue_registry=registry)
+    cog = Music(
+        bot,
+        ffmpeg_source_class=ffmpeg,
+        voice_managers={GUILD_ID: vm},
+        queue_registry=registry,
+    )
     return cog, vm
 
 
 def _make_track(title="Test Track", url="http://test.com/audio"):
-    return AudioTrack(title=title, url=url, stream_url=url, duration=180, source="youtube")
+    return AudioTrack(
+        title=title, url=url, stream_url=url, duration=180, source="youtube"
+    )
 
 
 # ---------------------------------------------------------------------------
 # skip command tests
 # ---------------------------------------------------------------------------
+
 
 class TestSkipCommand:
     def test_skip_while_playing_with_next_track_replies_now_playing(self):
@@ -169,25 +180,28 @@ class TestSkipCommand:
         assert cog.service.skipping == {}
 
     def test_on_track_end_skips_play_next_when_skipping_flag_set(self):
-        """_make_on_track_end callback does NOT schedule _play_next when _skipping is True."""
+        """_make_on_track_end callback does NOT schedule _play_next
+        when _skipping is True."""
         bot = MagicMock()
         bot.loop = asyncio.new_event_loop()
         cog = Music(bot)
         cog.service.skipping[GUILD_ID] = True
         scheduled_coroutines = []
 
-        import asyncio as _asyncio
-        original = _asyncio.run_coroutine_threadsafe
-
         def capture(coro, loop):
             scheduled_coroutines.append(coro)
             return MagicMock()
 
-        callback = cog._make_on_track_end(GUILD_ID)  # _make_on_track_end stays on the cog
+        callback = cog._make_on_track_end(
+            GUILD_ID
+        )  # _make_on_track_end stays on the cog
         # Patch run_coroutine_threadsafe to detect scheduling
         import unittest.mock as mock
+
         with mock.patch("asyncio.run_coroutine_threadsafe", side_effect=capture):
             callback(None)
 
-        assert len(scheduled_coroutines) == 0, "_play_next must NOT be scheduled during skip"
+        assert len(scheduled_coroutines) == 0, (
+            "_play_next must NOT be scheduled during skip"
+        )
         assert cog.service.skipping.get(GUILD_ID, True) is False, "flag must be cleared"

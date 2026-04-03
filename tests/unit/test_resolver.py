@@ -1,7 +1,7 @@
 """Unit tests for AudioResolver."""
+
 from __future__ import annotations
 
-import io
 import json
 import os
 
@@ -19,6 +19,7 @@ from bot.audio.resolver import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_mock_ydl_class(info: dict) -> MagicMock:
     """Return a mock YoutubeDL class whose extract_info returns *info*."""
@@ -59,6 +60,7 @@ def _search_info(title="Found Song") -> dict:
 # ---------------------------------------------------------------------------
 # AudioTrack
 # ---------------------------------------------------------------------------
+
 
 class TestAudioTrack:
     def test_fields(self):
@@ -101,6 +103,7 @@ class TestAudioTrack:
 # ---------------------------------------------------------------------------
 # AudioResolver – YouTube URL  (RED → will raise NotImplementedError)
 # ---------------------------------------------------------------------------
+
 
 class TestResolveYouTube:
     def test_youtube_com_url(self):
@@ -152,6 +155,7 @@ class TestResolveYouTube:
 # AudioResolver – Spotify URL (now unsupported)
 # ---------------------------------------------------------------------------
 
+
 class TestResolveSpotify:
     def test_spotify_url_raises_unsupported_source_error(self):
         resolver = AudioResolver(ytdl_class=MagicMock())
@@ -167,6 +171,7 @@ class TestResolveSpotify:
 # ---------------------------------------------------------------------------
 # AudioResolver – SoundCloud URL
 # ---------------------------------------------------------------------------
+
 
 class TestResolveSoundCloud:
     def test_soundcloud_url(self):
@@ -200,6 +205,7 @@ class TestResolveSoundCloud:
 # ---------------------------------------------------------------------------
 # AudioResolver – plain search string
 # ---------------------------------------------------------------------------
+
 
 class TestResolveSearch:
     def test_plain_search_query(self):
@@ -246,6 +252,7 @@ class TestResolveSearch:
 # AudioResolver – unsupported URL
 # ---------------------------------------------------------------------------
 
+
 class TestResolveUnsupported:
     def test_unsupported_https_url_raises(self):
         resolver = AudioResolver(ytdl_class=MagicMock())
@@ -268,6 +275,7 @@ class TestResolveUnsupported:
 # AudioResolver – duration defaults to 0 when missing from info
 # ---------------------------------------------------------------------------
 
+
 class TestResolveDurationFallback:
     def test_missing_duration_defaults_to_zero(self):
         info = {
@@ -285,6 +293,7 @@ class TestResolveDurationFallback:
 # ---------------------------------------------------------------------------
 # AudioResolver – _get_ytdl_class lazy-import path
 # ---------------------------------------------------------------------------
+
 
 class TestGetYtdlClassLazyImport:
     def test_lazy_import_when_ytdl_class_not_provided(self):
@@ -460,7 +469,9 @@ def _yt_search_response(video_ids: list[str]) -> dict:
                 "snippet": {
                     "title": f"Title {vid_id}",
                     "thumbnails": {
-                        "high": {"url": f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"}
+                        "high": {
+                            "url": f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
+                        }
                     },
                 },
             }
@@ -484,10 +495,12 @@ class TestSearchYouTubeApi:
 
     def test_uses_youtube_api_when_key_set(self):
         video_ids = ["abc123"]
-        http_fn = _make_http_get_fn([
-            _yt_search_response(video_ids),
-            _yt_videos_response(video_ids, "PT2M30S"),
-        ])
+        http_fn = _make_http_get_fn(
+            [
+                _yt_search_response(video_ids),
+                _yt_videos_response(video_ids, "PT2M30S"),
+            ]
+        )
         resolver = AudioResolver(_http_get_fn=http_fn)
         with patch.dict(os.environ, {"YOUTUBE_API_KEY": "test-key"}):
             results = resolver.search("test query")
@@ -499,10 +512,12 @@ class TestSearchYouTubeApi:
 
     def test_multiple_results(self):
         video_ids = ["v1", "v2", "v3"]
-        http_fn = _make_http_get_fn([
-            _yt_search_response(video_ids),
-            _yt_videos_response(video_ids, "PT1M0S"),
-        ])
+        http_fn = _make_http_get_fn(
+            [
+                _yt_search_response(video_ids),
+                _yt_videos_response(video_ids, "PT1M0S"),
+            ]
+        )
         resolver = AudioResolver(_http_get_fn=http_fn)
         with patch.dict(os.environ, {"YOUTUBE_API_KEY": "key"}):
             results = resolver.search("query", max_results=3)
@@ -518,6 +533,7 @@ class TestSearchYouTubeApi:
 
     def test_falls_back_to_soundcloud_when_youtube_api_raises(self):
         """If the YouTube API call raises an exception, fall back to SoundCloud."""
+
         def bad_http_fn(url):
             raise OSError("network error")
 
@@ -528,5 +544,3 @@ class TestSearchYouTubeApi:
             results = resolver.search("test")
         assert len(results) == 1
         assert results[0]["title"] == "SC Track"
-
-

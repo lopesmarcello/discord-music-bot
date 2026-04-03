@@ -1,4 +1,5 @@
 """Smoke test verifying the project scaffold is correctly set up."""
+
 from bot.audio.resolver import AudioTrack, AudioResolver, UnsupportedSourceError
 from bot.audio.queue import Queue
 from bot.audio.voice import VoiceManager

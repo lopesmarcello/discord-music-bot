@@ -1,4 +1,5 @@
 """HTTP API server that runs alongside the Discord bot."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -15,6 +16,7 @@ async def handle_health(request: "aiohttp.web.Request") -> "aiohttp.web.Response
     bot_ready = bot is not None and bot.is_ready() if bot is not None else False
 
     import json  # noqa: PLC0415
+
     return aiohttp.web.Response(
         text=json.dumps({"status": "ok", "bot_ready": bot_ready}),
         content_type="application/json",

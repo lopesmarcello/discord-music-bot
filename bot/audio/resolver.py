@@ -1,4 +1,5 @@
 """Audio source resolver for YouTube and SoundCloud."""
+
 from __future__ import annotations
 
 import json as _json
@@ -68,6 +69,7 @@ class AudioResolver:
         if self._ytdl_class is not None:
             return self._ytdl_class
         import yt_dlp  # pragma: no cover
+
         return yt_dlp.YoutubeDL  # pragma: no cover
 
     def _fetch_json(self, url: str) -> dict:
@@ -110,13 +112,15 @@ class AudioResolver:
 
     def _search_youtube_api(self, query: str, max_results: int, api_key: str) -> list:
         """Search via YouTube Data API v3; returns list of result dicts."""
-        search_params = urllib.parse.urlencode({
-            "part": "snippet",
-            "type": "video",
-            "q": query,
-            "maxResults": max_results,
-            "key": api_key,
-        })
+        search_params = urllib.parse.urlencode(
+            {
+                "part": "snippet",
+                "type": "video",
+                "q": query,
+                "maxResults": max_results,
+                "key": api_key,
+            }
+        )
         search_data = self._fetch_json(f"{_YOUTUBE_API_BASE}/search?{search_params}")
         items = search_data.get("items", [])
         if not items:
@@ -124,11 +128,13 @@ class AudioResolver:
 
         video_ids = [item["id"]["videoId"] for item in items]
 
-        videos_params = urllib.parse.urlencode({
-            "part": "contentDetails",
-            "id": ",".join(video_ids),
-            "key": api_key,
-        })
+        videos_params = urllib.parse.urlencode(
+            {
+                "part": "contentDetails",
+                "id": ",".join(video_ids),
+                "key": api_key,
+            }
+        )
         videos_data = self._fetch_json(f"{_YOUTUBE_API_BASE}/videos?{videos_params}")
         duration_map: dict[str, int] = {}
         for vid in videos_data.get("items", []):
@@ -146,12 +152,14 @@ class AudioResolver:
                 or thumbnails.get("default", {}).get("url")
                 or ""
             )
-            results.append({
-                "title": snippet.get("title", ""),
-                "url": f"https://www.youtube.com/watch?v={vid_id}",
-                "duration": duration_map.get(vid_id, 0),
-                "thumbnail": thumbnail,
-            })
+            results.append(
+                {
+                    "title": snippet.get("title", ""),
+                    "url": f"https://www.youtube.com/watch?v={vid_id}",
+                    "duration": duration_map.get(vid_id, 0),
+                    "thumbnail": thumbnail,
+                }
+            )
         return results
 
     def _search_ytdlp_scsearch(self, query: str, max_results: int) -> list:
@@ -164,12 +172,14 @@ class AudioResolver:
         results = []
         for entry in entries:
             if entry:
-                results.append({
-                    "title": entry.get("title", ""),
-                    "url": entry.get("webpage_url", ""),
-                    "duration": entry.get("duration", 0),
-                    "thumbnail": entry.get("thumbnail", ""),
-                })
+                results.append(
+                    {
+                        "title": entry.get("title", ""),
+                        "url": entry.get("webpage_url", ""),
+                        "duration": entry.get("duration", 0),
+                        "thumbnail": entry.get("thumbnail", ""),
+                    }
+                )
         return results
 
     def search(self, query: str, max_results: int = 5) -> list:

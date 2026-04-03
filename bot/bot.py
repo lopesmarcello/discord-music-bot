@@ -1,4 +1,5 @@
 """Bot instantiation and cog loading."""
+
 import logging
 import os
 
@@ -30,6 +31,7 @@ def create_bot() -> commands.Bot:
     # Load cogs
     async def setup_hook() -> None:
         from bot.cogs.music import Music  # noqa: PLC0415
+
         await bot.add_cog(Music(bot))
 
     bot.setup_hook = setup_hook  # type: ignore[method-assign]

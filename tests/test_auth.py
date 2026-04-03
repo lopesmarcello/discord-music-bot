@@ -1,4 +1,5 @@
 """Tests for US-002: Discord OAuth2 authentication in the API."""
+
 from __future__ import annotations
 
 import asyncio
@@ -36,7 +37,10 @@ from bot.api.auth import (  # noqa: E402
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_request(path: str = "/auth/me", cookies: dict | None = None, query: dict | None = None):
+
+def _make_request(
+    path: str = "/auth/me", cookies: dict | None = None, query: dict | None = None
+):
     req = MagicMock()
     req.path = path
     req.cookies = cookies or {}
@@ -100,12 +104,14 @@ class TestJWT:
 
     def test_decode_invalid_token_raises(self):
         import pytest
+
         with patch.dict("os.environ", {"JWT_SECRET": "testsecret"}):
             with pytest.raises(Exception):
                 decode_jwt("not.a.valid.token!!!!")
 
     def test_jwt_secret_required(self):
         import pytest
+
         env = {k: v for k, v in __import__("os").environ.items() if k != "JWT_SECRET"}
         with patch.dict("os.environ", env, clear=True):
             with pytest.raises(ValueError, match="JWT_SECRET"):
@@ -120,6 +126,7 @@ class TestJWT:
 class TestHandleAuthDiscord:
     def test_redirects_to_discord(self):
         import pytest
+
         req = _make_request(path="/auth/discord", query={"guild_id": "987654321"})
         env = {
             "JWT_SECRET": "secret",
@@ -133,6 +140,7 @@ class TestHandleAuthDiscord:
 
     def test_redirect_contains_guild_id_as_state(self):
         import pytest
+
         req = _make_request(path="/auth/discord", query={"guild_id": "111222333"})
         env = {
             "JWT_SECRET": "secret",
@@ -148,6 +156,7 @@ class TestHandleAuthDiscord:
 
     def test_redirect_contains_client_id(self):
         import pytest
+
         req = _make_request(path="/auth/discord", query={"guild_id": "1"})
         env = {
             "JWT_SECRET": "secret",
@@ -168,6 +177,7 @@ class TestHandleAuthDiscord:
 class TestHandleAuthCallback:
     def test_missing_code_redirects_error(self):
         import pytest
+
         req = _make_request(path="/auth/callback", query={"code": "", "state": "123"})
         env = {"JWT_SECRET": "secret", "DASHBOARD_URL": "http://localhost:3000"}
         with patch.dict("os.environ", env):
@@ -177,7 +187,10 @@ class TestHandleAuthCallback:
 
     def test_successful_login_sets_cookie(self):
         import pytest
-        req = _make_request(path="/auth/callback", query={"code": "valid_code", "state": "999"})
+
+        req = _make_request(
+            path="/auth/callback", query={"code": "valid_code", "state": "999"}
+        )
         factory = _make_session_factory(
             token_data={"access_token": "discord_token_abc"},
             user_data={"id": "u1", "username": "alice", "avatar": "avatar_hash"},
@@ -197,7 +210,10 @@ class TestHandleAuthCallback:
 
     def test_user_not_in_guild_redirects_error(self):
         import pytest
-        req = _make_request(path="/auth/callback", query={"code": "valid_code", "state": "999"})
+
+        req = _make_request(
+            path="/auth/callback", query={"code": "valid_code", "state": "999"}
+        )
         factory = _make_session_factory(
             token_data={"access_token": "tok"},
             user_data={"id": "u1", "username": "alice", "avatar": None},
@@ -217,7 +233,10 @@ class TestHandleAuthCallback:
 
     def test_discord_token_error_redirects_error(self):
         import pytest
-        req = _make_request(path="/auth/callback", query={"code": "bad_code", "state": "999"})
+
+        req = _make_request(
+            path="/auth/callback", query={"code": "bad_code", "state": "999"}
+        )
         factory = _make_session_factory(
             token_data={"error": "invalid_grant"},
             user_data={},
@@ -237,7 +256,11 @@ class TestHandleAuthCallback:
 
     def test_successful_login_jwt_contains_exp_claim(self):
         import pytest
-        req = _make_request(path="/auth/callback", query={"code": "valid_code", "state": "999"})
+
+        req = _make_request(
+            path="/auth/callback",
+            query={"code": "valid_code", "state": "999"},
+        )
         factory = _make_session_factory(
             token_data={"access_token": "discord_token_abc"},
             user_data={"id": "u1", "username": "alice", "avatar": "avatar_hash"},
@@ -253,15 +276,18 @@ class TestHandleAuthCallback:
         with patch.dict("os.environ", env):
             with pytest.raises(FakeHTTPFound) as exc_info:
                 asyncio.run(handle_auth_callback(req, _http_session_factory=factory))
-        token = exc_info.value._cookies.get(COOKIE_NAME)
-        assert token is not None
-        payload = decode_jwt(token)
+            token = exc_info.value._cookies.get(COOKIE_NAME)
+            assert token is not None
+            payload = decode_jwt(token)
         assert "exp" in payload, "JWT must contain an exp claim"
         assert isinstance(payload["exp"], int), "exp must be a unix timestamp integer"
 
     def test_successful_redirect_contains_guild_id(self):
         import pytest
-        req = _make_request(path="/auth/callback", query={"code": "valid_code", "state": "42"})
+
+        req = _make_request(
+            path="/auth/callback", query={"code": "valid_code", "state": "42"}
+        )
         factory = _make_session_factory(
             token_data={"access_token": "tok"},
             user_data={"id": "u1", "username": "bob", "avatar": None},
@@ -288,12 +314,14 @@ class TestHandleAuthCallback:
 class TestHandleAuthMe:
     def test_no_cookie_returns_401(self):
         import pytest
+
         req = _make_request(path="/auth/me", cookies={})
         with pytest.raises(FakeHTTPUnauthorized):
             asyncio.run(handle_auth_me(req))
 
     def test_invalid_token_returns_401(self):
         import pytest
+
         req = _make_request(path="/auth/me", cookies={COOKIE_NAME: "badtoken"})
         with patch.dict("os.environ", {"JWT_SECRET": "secret"}):
             with pytest.raises(FakeHTTPUnauthorized):
@@ -337,8 +365,10 @@ class TestHandleAuthLogout:
 class TestJwtMiddleware:
     def _run_middleware(self, request, handler=None):
         if handler is None:
+
             async def handler(req):
                 return FakeResponse("ok")
+
         middleware = make_jwt_middleware()
         return asyncio.run(middleware(request, handler))
 
@@ -359,12 +389,14 @@ class TestJwtMiddleware:
 
     def test_missing_cookie_returns_401(self):
         import pytest
+
         req = _make_request(path="/api/guilds/123/queue", cookies={})
         with pytest.raises(FakeHTTPUnauthorized):
             self._run_middleware(req)
 
     def test_invalid_token_returns_401(self):
         import pytest
+
         req = _make_request(
             path="/api/guilds/123/queue",
             cookies={COOKIE_NAME: "invalid.token"},

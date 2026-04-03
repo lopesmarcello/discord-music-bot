@@ -1,4 +1,5 @@
 """Discord OAuth2 authentication routes and JWT utilities."""
+
 from __future__ import annotations
 
 import json
@@ -23,8 +24,10 @@ COOKIE_NAME = "session"
 # JWT helpers (lazy-import PyJWT)
 # ---------------------------------------------------------------------------
 
+
 def _get_jwt_module():
     import jwt  # noqa: PLC0415
+
     return jwt
 
 
@@ -51,6 +54,7 @@ def decode_jwt(token: str) -> dict:
 # Auth route handlers
 # ---------------------------------------------------------------------------
 
+
 async def handle_auth_discord(request: "aiohttp.web.Request") -> "aiohttp.web.Response":
     """GET /auth/discord?guild_id={id} — redirect to Discord OAuth2."""
     import aiohttp.web  # noqa: PLC0415, F401
@@ -59,13 +63,15 @@ async def handle_auth_discord(request: "aiohttp.web.Request") -> "aiohttp.web.Re
     client_id = os.environ.get("DISCORD_CLIENT_ID", "")
     redirect_uri = os.environ.get("DISCORD_REDIRECT_URI", "")
 
-    params = urllib.parse.urlencode({
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "scope": "identify guilds",
-        "state": guild_id,
-    })
+    params = urllib.parse.urlencode(
+        {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": "identify guilds",
+            "state": guild_id,
+        }
+    )
     raise aiohttp.web.HTTPFound(f"{DISCORD_OAUTH_BASE}?{params}")
 
 
@@ -186,11 +192,13 @@ async def handle_auth_me(request: "aiohttp.web.Request") -> "aiohttp.web.Respons
         raise aiohttp.web.HTTPUnauthorized()
 
     return aiohttp.web.Response(
-        text=json.dumps({
-            "id": payload.get("id"),
-            "username": payload.get("username"),
-            "avatar": payload.get("avatar"),
-        }),
+        text=json.dumps(
+            {
+                "id": payload.get("id"),
+                "username": payload.get("username"),
+                "avatar": payload.get("avatar"),
+            }
+        ),
         content_type="application/json",
     )
 
@@ -207,6 +215,7 @@ async def handle_auth_logout(request: "aiohttp.web.Request") -> "aiohttp.web.Res
 # ---------------------------------------------------------------------------
 # JWT middleware
 # ---------------------------------------------------------------------------
+
 
 def make_jwt_middleware():
     """Return an aiohttp middleware that enforces JWT auth on non-/auth/* routes."""
@@ -236,6 +245,7 @@ def make_jwt_middleware():
 # ---------------------------------------------------------------------------
 # Route setup
 # ---------------------------------------------------------------------------
+
 
 def setup_auth_routes(app: "aiohttp.web.Application") -> None:
     """Register auth routes on the aiohttp application."""

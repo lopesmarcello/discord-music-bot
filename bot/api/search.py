@@ -1,4 +1,5 @@
 """YouTube search API route handler."""
+
 from __future__ import annotations
 
 import json
@@ -46,6 +47,7 @@ async def handle_search(
             resolver = music.service.resolver
         else:
             from bot.audio.resolver import AudioResolver  # noqa: PLC0415
+
             resolver = AudioResolver()
 
     try:

@@ -1,4 +1,5 @@
 """Guild listing API route handler."""
+
 from __future__ import annotations
 
 import json

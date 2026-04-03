@@ -1,4 +1,5 @@
 """Music commands cog for the Discord bot."""
+
 from __future__ import annotations
 
 import asyncio
@@ -41,6 +42,7 @@ class Music(commands.Cog):
 
     def _make_on_track_end(self, guild_id: int):
         """Return a callback that advances the queue when a track finishes."""
+
         def callback(error: Optional[Exception]) -> None:  # pragma: no cover
             if self.service.skipping.get(guild_id, False):
                 self.service.skipping[guild_id] = False
@@ -48,6 +50,7 @@ class Music(commands.Cog):
             loop = self.bot.loop
             if loop and not loop.is_closed():
                 asyncio.run_coroutine_threadsafe(self.service.play_next(guild_id), loop)
+
         return callback
 
     # ------------------------------------------------------------------
@@ -132,9 +135,10 @@ class Music(commands.Cog):
         started_at = self.service.started_at.get(ctx.guild.id)
         if started_at is not None:
             import time  # noqa: PLC0415
-            self.service.elapsed_offset[ctx.guild.id] = (
-                self.service.elapsed_offset.get(ctx.guild.id, 0.0) + (time.time() - started_at)
-            )
+
+            self.service.elapsed_offset[ctx.guild.id] = self.service.elapsed_offset.get(
+                ctx.guild.id, 0.0
+            ) + (time.time() - started_at)
             self.service.started_at[ctx.guild.id] = None
         vm.pause()
         await ctx.send("Paused.")
@@ -148,6 +152,7 @@ class Music(commands.Cog):
             return
         vm.resume()
         import time  # noqa: PLC0415
+
         self.service.started_at[ctx.guild.id] = time.time()
         await ctx.send("Resumed.")
 

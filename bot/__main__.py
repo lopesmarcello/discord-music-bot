@@ -1,4 +1,5 @@
 """Entry point for the Discord music bot."""
+
 import asyncio
 import logging
 import os

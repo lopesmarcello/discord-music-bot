@@ -1,4 +1,5 @@
 """Voice connection manager for Discord audio playback."""
+
 from __future__ import annotations
 
 from typing import Callable, Optional
@@ -84,4 +85,5 @@ class VoiceManager:
         if self._ffmpeg_source_class is not None:
             return self._ffmpeg_source_class
         import discord  # pragma: no cover
+
         return discord.FFmpegPCMAudio  # pragma: no cover

@@ -1,4 +1,5 @@
 """Queue and playback API route handlers."""
+
 from __future__ import annotations
 
 import json
@@ -82,10 +83,12 @@ async def handle_queue_get(request: "aiohttp.web.Request") -> "aiohttp.web.Respo
     tracks = queue.list()
 
     return aiohttp.web.Response(
-        text=json.dumps({
-            "current": _track_dict(current) if current is not None else None,
-            "tracks": [_track_dict(t) for t in tracks],
-        }),
+        text=json.dumps(
+            {
+                "current": _track_dict(current) if current is not None else None,
+                "tracks": [_track_dict(t) for t in tracks],
+            }
+        ),
         content_type="application/json",
     )
 
@@ -115,11 +118,13 @@ async def handle_queue_skip(request: "aiohttp.web.Request") -> "aiohttp.web.Resp
     tracks = queue.list()
     _log.info("Skipped track in guild %s", guild_id)
     return aiohttp.web.Response(
-        text=json.dumps({
-            "skipped": True,
-            "current": _track_dict(current) if current is not None else None,
-            "tracks": [_track_dict(t) for t in tracks],
-        }),
+        text=json.dumps(
+            {
+                "skipped": True,
+                "current": _track_dict(current) if current is not None else None,
+                "tracks": [_track_dict(t) for t in tracks],
+            }
+        ),
         content_type="application/json",
     )
 
@@ -171,6 +176,7 @@ async def handle_queue_add(
 
     try:
         from bot.audio.resolver import UnsupportedSourceError  # noqa: PLC0415
+
         track = resolver.resolve(url)
     except UnsupportedSourceError as exc:
         raise aiohttp.web.HTTPBadRequest(reason=str(exc))
@@ -188,10 +194,12 @@ async def handle_queue_add(
         await svc.play_next(guild_id)
 
     return aiohttp.web.Response(
-        text=json.dumps({
-            "added": True,
-            "track": _track_dict(track),
-        }),
+        text=json.dumps(
+            {
+                "added": True,
+                "track": _track_dict(track),
+            }
+        ),
         content_type="application/json",
     )
 
@@ -225,9 +233,7 @@ async def handle_playback_get(request: "aiohttp.web.Request") -> "aiohttp.web.Re
         started_at = svc.started_at.get(guild_id)
         offset = svc.elapsed_offset.get(guild_id, 0.0)
         elapsed_seconds = (
-            (time.time() - started_at + offset)
-            if started_at is not None
-            else None
+            (time.time() - started_at + offset) if started_at is not None else None
         )
     else:  # paused
         elapsed_seconds = svc.elapsed_offset.get(guild_id, 0.0)
@@ -258,8 +264,8 @@ async def handle_playback_pause(
 
     started_at = svc.started_at.get(guild_id)
     if started_at is not None:
-        svc.elapsed_offset[guild_id] = (
-            svc.elapsed_offset.get(guild_id, 0.0) + (time.time() - started_at)
+        svc.elapsed_offset[guild_id] = svc.elapsed_offset.get(guild_id, 0.0) + (
+            time.time() - started_at
         )
         svc.started_at[guild_id] = None
     vm.pause()

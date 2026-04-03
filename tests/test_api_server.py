@@ -1,7 +1,9 @@
 """Tests for US-001: HTTP API server embedded in the bot."""
+
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 from unittest.mock import patch
@@ -12,8 +14,6 @@ _mock_web = sys.modules["aiohttp.web"]
 _FakeApplication = _mock_web.Application
 _FakeAppRunner = _mock_web.AppRunner
 _FakeTCPSite = _mock_web.TCPSite
-
-import json
 
 from bot.api.server import create_app, handle_health, start_api_server  # noqa: E402
 
@@ -57,6 +57,7 @@ class TestStartApiServer:
 
         def capturing_tcp_site(runner, host, port):
             from tests.conftest import FakeTCPSite  # noqa: PLC0415
+
             site = FakeTCPSite(runner, host, port)
             created_sites.append(site)
             return site
@@ -74,6 +75,7 @@ class TestStartApiServer:
 
         def capturing_tcp_site(runner, host, port):
             from tests.conftest import FakeTCPSite  # noqa: PLC0415
+
             captured.append((host, port))
             return FakeTCPSite(runner, host, port)
 
@@ -89,6 +91,7 @@ class TestStartApiServer:
 
         def capturing_tcp_site(runner, host, port):
             from tests.conftest import FakeTCPSite  # noqa: PLC0415
+
             captured.append((host, port))
             return FakeTCPSite(runner, host, port)
 
@@ -121,6 +124,7 @@ class TestHealthEndpoint:
 
     def test_health_returns_ok_without_bot(self):
         from unittest.mock import MagicMock  # noqa: PLC0415
+
         request = MagicMock()
         request.app = _FakeApplication()
         resp = asyncio.run(handle_health(request))
@@ -130,6 +134,7 @@ class TestHealthEndpoint:
 
     def test_health_returns_bot_ready_when_bot_present(self):
         from unittest.mock import MagicMock  # noqa: PLC0415
+
         bot = MagicMock()
         bot.is_ready.return_value = True
         request = MagicMock()

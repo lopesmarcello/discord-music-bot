@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import aiohttp.web
@@ -47,7 +50,8 @@ async def handle_search(
 
     try:
         results = resolver.search(q, max_results=limit)
-    except Exception:
+    except Exception as exc:
+        _log.warning("Search failed for query %r: %s", q, exc)
         return aiohttp.web.Response(
             text=json.dumps({"error": "Search unavailable"}),
             content_type="application/json",

@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import aiohttp.web
@@ -38,6 +41,18 @@ def _require_guild_id(request: "aiohttp.web.Request") -> int:
         raise aiohttp.web.HTTPBadRequest(reason="guild_id must be an integer")
 
 
+def _require_guild_membership(request: "aiohttp.web.Request", guild_id: int) -> None:
+    """Verify the authenticated user belongs to the requested guild."""
+    import aiohttp.web  # noqa: PLC0415, F401
+
+    jwt_payload = request.get("jwt_payload")
+    if jwt_payload is None:
+        return  # No JWT context (e.g., no middleware); skip check
+    user_guild_ids = jwt_payload.get("guild_ids", [])
+    if str(guild_id) not in user_guild_ids:
+        raise aiohttp.web.HTTPForbidden(reason="You are not a member of this guild")
+
+
 def _track_dict(track) -> dict:
     return {
         "title": track.title,
@@ -53,6 +68,7 @@ async def handle_queue_get(request: "aiohttp.web.Request") -> "aiohttp.web.Respo
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
+    _require_guild_membership(request, guild_id)
     svc = _get_service(request)
 
     if svc is None:
@@ -79,6 +95,7 @@ async def handle_queue_skip(request: "aiohttp.web.Request") -> "aiohttp.web.Resp
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
+    _require_guild_membership(request, guild_id)
     svc = _get_service(request)
 
     if svc is None:
@@ -96,6 +113,7 @@ async def handle_queue_skip(request: "aiohttp.web.Request") -> "aiohttp.web.Resp
     current = svc.current_tracks.get(guild_id)
     queue = svc.queue_registry.get_queue(guild_id)
     tracks = queue.list()
+    _log.info("Skipped track in guild %s", guild_id)
     return aiohttp.web.Response(
         text=json.dumps({
             "skipped": True,
@@ -111,6 +129,7 @@ async def handle_queue_clear(request: "aiohttp.web.Request") -> "aiohttp.web.Res
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
+    _require_guild_membership(request, guild_id)
     svc = _get_service(request)
 
     if svc is None:
@@ -134,6 +153,7 @@ async def handle_queue_add(
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
+    _require_guild_membership(request, guild_id)
     svc = _get_service(request)
 
     if svc is None:
@@ -182,6 +202,7 @@ async def handle_playback_get(request: "aiohttp.web.Request") -> "aiohttp.web.Re
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
+    _require_guild_membership(request, guild_id)
     svc = _get_service(request)
 
     if svc is None:
@@ -225,6 +246,7 @@ async def handle_playback_pause(
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
+    _require_guild_membership(request, guild_id)
     svc = _get_service(request)
 
     if svc is None:
@@ -255,6 +277,7 @@ async def handle_playback_resume(
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
+    _require_guild_membership(request, guild_id)
     svc = _get_service(request)
 
     if svc is None:
@@ -279,6 +302,7 @@ async def handle_playback_stop(
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
+    _require_guild_membership(request, guild_id)
     svc = _get_service(request)
 
     if svc is None:

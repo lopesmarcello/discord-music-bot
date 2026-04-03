@@ -1,5 +1,6 @@
 """Entry point for the Discord music bot."""
 import asyncio
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -23,6 +24,10 @@ async def _run(token: str) -> None:
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     load_dotenv()
     token = os.environ["DISCORD_TOKEN"]
     asyncio.run(_run(token))

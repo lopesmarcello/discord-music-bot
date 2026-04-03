@@ -42,6 +42,18 @@ class FakeHTTPBadRequest(FakeHTTPException):
         self.reason = reason
 
 
+class FakeHTTPForbidden(FakeHTTPException):
+    def __init__(self, *, reason: str = ""):
+        super().__init__(reason)
+        self.reason = reason
+
+
+class FakeHTTPConflict(FakeHTTPException):
+    def __init__(self, *, reason: str = ""):
+        super().__init__(reason)
+        self.reason = reason
+
+
 class FakeHTTPServiceUnavailable(FakeHTTPException):
     def __init__(self, *, reason: str = ""):
         super().__init__(reason)
@@ -108,6 +120,8 @@ mock_web.TCPSite = FakeTCPSite
 mock_web.HTTPFound = FakeHTTPFound
 mock_web.HTTPUnauthorized = FakeHTTPUnauthorized
 mock_web.HTTPBadRequest = FakeHTTPBadRequest
+mock_web.HTTPForbidden = FakeHTTPForbidden
+mock_web.HTTPConflict = FakeHTTPConflict
 mock_web.HTTPServiceUnavailable = FakeHTTPServiceUnavailable
 mock_web.HTTPException = FakeHTTPException
 mock_web.Response = FakeResponse

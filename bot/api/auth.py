@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import urllib.parse
 from datetime import datetime, timezone, timedelta
 from typing import TYPE_CHECKING
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import aiohttp.web
@@ -165,6 +168,7 @@ async def handle_auth_callback(
     redirect_url = f"{dashboard_url}?guild={guild_id}" if guild_id else dashboard_url
     response = aiohttp.web.HTTPFound(redirect_url)
     response.set_cookie(COOKIE_NAME, token, httponly=True, path="/", samesite="Lax")
+    _log.info("User %s authenticated for guild %s", user_data.get("username"), guild_id)
     raise response
 
 
@@ -220,6 +224,7 @@ def make_jwt_middleware():
         try:
             payload = decode_jwt(token)
         except Exception:  # noqa: BLE001
+            _log.debug("JWT decode failed for request to %s", request.path)
             raise aiohttp.web.HTTPUnauthorized()
 
         request["jwt_payload"] = payload

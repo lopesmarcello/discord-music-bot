@@ -1,0 +1,68 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - development
+          - production
+
+jobs:
+  check-ci:
+    name: Verify CI Status
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check latest CI status on main
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: checks } = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'main',
+              per_page: 100,
+            });
+            const ciRuns = checks.check_runs.filter(r =>
+              ['Test Bot (Python 3.11)', 'Lint Dashboard (Node.js 20)', 'Validate Docker Builds'].includes(r.name)
+            );
+            const failed = ciRuns.filter(r => r.conclusion !== 'success');
+            if (failed.length > 0) {
+              const names = failed.map(r => `${r.name}: ${r.conclusion}`).join(', ');
+              core.setFailed(`CI checks not passing on main: ${names}`);
+            } else if (ciRuns.length === 0) {
+              core.setFailed('No CI runs found on main. Push to main first to trigger CI.');
+            } else {
+              core.info(`All ${ciRuns.length} CI checks passing on main.`);
+            }
+
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    needs: check-ci
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ inputs.environment == 'production' && secrets.PROD_HOST || secrets.DEV_HOST }}
+          username: ${{ inputs.environment == 'production' && secrets.PROD_USER || secrets.DEV_USER }}
+          key: ${{ inputs.environment == 'production' && secrets.PROD_SSH_KEY || secrets.DEV_SSH_KEY }}
+          script: |
+            cd ${{ inputs.environment == 'production' && secrets.PROD_DEPLOY_PATH || secrets.DEV_DEPLOY_PATH }}
+            git pull origin main
+            docker compose up -d --build
+
+      - name: Notify result
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const env = '${{ inputs.environment }}';
+            const emoji = status === 'success' ? '✅' : '❌';
+            const msg = `${emoji} Deploy to **${env}**: ${status}`;
+            core.notice(msg);

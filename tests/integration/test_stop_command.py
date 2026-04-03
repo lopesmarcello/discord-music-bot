@@ -1,4 +1,5 @@
 """Integration tests for stop command (US-008)."""
+
 from __future__ import annotations
 
 import asyncio
@@ -14,6 +15,7 @@ GUILD_ID = 42
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_vc(playing=False, paused=False):
     """Return a mock discord.VoiceClient."""
@@ -43,20 +45,29 @@ def _make_cog_with_vm(vc, queue_registry=None):
     bot.loop = asyncio.new_event_loop()
     ffmpeg = MagicMock()
     from bot.audio.voice import VoiceManager
+
     vm = VoiceManager(ffmpeg_source_class=ffmpeg)
     vm._voice_client = vc
     registry = queue_registry if queue_registry is not None else GuildQueueRegistry()
-    cog = Music(bot, ffmpeg_source_class=ffmpeg, voice_managers={GUILD_ID: vm}, queue_registry=registry)
+    cog = Music(
+        bot,
+        ffmpeg_source_class=ffmpeg,
+        voice_managers={GUILD_ID: vm},
+        queue_registry=registry,
+    )
     return cog, vm
 
 
 def _make_track(title="Test Track", url="http://test.com/audio"):
-    return AudioTrack(title=title, url=url, stream_url=url, duration=180, source="youtube")
+    return AudioTrack(
+        title=title, url=url, stream_url=url, duration=180, source="youtube"
+    )
 
 
 # ---------------------------------------------------------------------------
 # stop command tests
 # ---------------------------------------------------------------------------
+
 
 class TestStopCommand:
     def test_stop_while_playing_replies_stopped_and_disconnected(self):

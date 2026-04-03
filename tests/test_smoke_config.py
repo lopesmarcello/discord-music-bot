@@ -9,6 +9,7 @@ Manual Docker verification (requires Docker daemon + .env with DISCORD_TOKEN):
   docker compose up --build
   # Then confirm bot joins voice channels and /play works without PyNaCl errors.
 """
+
 from __future__ import annotations
 
 import re
@@ -21,15 +22,18 @@ ROOT = Path(__file__).parent.parent
 def _read_pyproject() -> dict:
     if sys.version_info >= (3, 11):
         import tomllib
+
         return tomllib.loads((ROOT / "pyproject.toml").read_text())
     else:  # pragma: no cover
         import tomli  # type: ignore[import]
+
         return tomli.loads((ROOT / "pyproject.toml").read_text())
 
 
 # ---------------------------------------------------------------------------
 # pyproject.toml: discord.py[voice] declared
 # ---------------------------------------------------------------------------
+
 
 class TestPyprojectVoiceDependency:
     def test_discord_voice_extra_declared(self):
@@ -46,7 +50,9 @@ class TestPyprojectVoiceDependency:
         """discord.py[voice] must require version >= 2.0."""
         data = _read_pyproject()
         deps = data["project"]["dependencies"]
-        voice_dep = next((d for d in deps if "discord" in d.lower() and "[voice]" in d), None)
+        voice_dep = next(
+            (d for d in deps if "discord" in d.lower() and "[voice]" in d), None
+        )
         assert voice_dep is not None
         assert ">=2.0" in voice_dep, (
             f"discord.py[voice] does not pin >=2.0; got: {voice_dep}"
@@ -56,6 +62,7 @@ class TestPyprojectVoiceDependency:
 # ---------------------------------------------------------------------------
 # Dockerfile: libsodium23 installed
 # ---------------------------------------------------------------------------
+
 
 class TestDockerfileLibsodium:
     def test_libsodium23_in_dockerfile(self):
@@ -85,6 +92,7 @@ class TestDockerfileLibsodium:
 # docker-compose.yml: build directive present
 # ---------------------------------------------------------------------------
 
+
 class TestDockerCompose:
     def test_docker_compose_exists(self):
         """docker-compose.yml must exist for 'docker compose up --build'."""
@@ -111,9 +119,11 @@ class TestDockerCompose:
 # No bare PyNaCl import in bot source (must come via discord.py[voice])
 # ---------------------------------------------------------------------------
 
+
 class TestNoBareNaclImport:
     def test_bot_source_does_not_directly_import_nacl(self):
-        """Bot source should not directly import nacl; it comes transitively via discord.py[voice]."""
+        """Bot source should not directly import nacl;
+        it comes transitively via discord.py[voice]."""
         bot_dir = ROOT / "bot"
         if not bot_dir.exists():
             return  # Skip if bot dir missing

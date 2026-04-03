@@ -1,7 +1,7 @@
 """Unit tests for Queue and GuildQueueRegistry (US-003)."""
+
 from __future__ import annotations
 
-import pytest
 
 from bot.audio.resolver import AudioTrack
 from bot.audio.queue import Queue, GuildQueueRegistry
@@ -10,6 +10,7 @@ from bot.audio.queue import Queue, GuildQueueRegistry
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_track(title: str = "Song", n: int = 1) -> AudioTrack:
     return AudioTrack(
@@ -24,6 +25,7 @@ def _make_track(title: str = "Song", n: int = 1) -> AudioTrack:
 # ---------------------------------------------------------------------------
 # Queue – add()
 # ---------------------------------------------------------------------------
+
 
 class TestQueueAdd:
     def test_add_single_track(self):
@@ -52,6 +54,7 @@ class TestQueueAdd:
 # ---------------------------------------------------------------------------
 # Queue – next()
 # ---------------------------------------------------------------------------
+
 
 class TestQueueNext:
     def test_next_returns_front_track(self):
@@ -91,6 +94,7 @@ class TestQueueNext:
 # Queue – peek()
 # ---------------------------------------------------------------------------
 
+
 class TestQueuePeek:
     def test_peek_returns_front_track_without_removing(self):
         q = Queue()
@@ -116,6 +120,7 @@ class TestQueuePeek:
 # ---------------------------------------------------------------------------
 # Queue – clear()
 # ---------------------------------------------------------------------------
+
 
 class TestQueueClear:
     def test_clear_empties_queue(self):
@@ -148,6 +153,7 @@ class TestQueueClear:
 # ---------------------------------------------------------------------------
 # Queue – list()
 # ---------------------------------------------------------------------------
+
 
 class TestQueueList:
     def test_list_returns_all_tracks_in_order(self):
@@ -182,6 +188,7 @@ class TestQueueList:
 # ---------------------------------------------------------------------------
 # GuildQueueRegistry – per-guild isolation
 # ---------------------------------------------------------------------------
+
 
 class TestGuildQueueRegistry:
     def test_get_queue_returns_queue_instance(self):

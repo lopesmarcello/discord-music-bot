@@ -1,11 +1,10 @@
 """Integration tests for pause/resume commands (US-006)."""
+
 from __future__ import annotations
 
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from bot.audio.resolver import AudioTrack
-from bot.audio.queue import GuildQueueRegistry
 from bot.cogs.music import Music
 
 GUILD_ID = 42
@@ -14,6 +13,7 @@ GUILD_ID = 42
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_vc(playing=False, paused=False):
     """Return a mock discord.VoiceClient."""
@@ -53,6 +53,7 @@ def _make_cog_with_vm(vc):
     bot.loop = asyncio.new_event_loop()
     ffmpeg = MagicMock()
     from bot.audio.voice import VoiceManager
+
     vm = VoiceManager(ffmpeg_source_class=ffmpeg)
     vm._voice_client = vc
     cog = Music(bot, ffmpeg_source_class=ffmpeg, voice_managers={GUILD_ID: vm})
@@ -62,6 +63,7 @@ def _make_cog_with_vm(vc):
 # ---------------------------------------------------------------------------
 # pause command tests
 # ---------------------------------------------------------------------------
+
 
 class TestPauseCommand:
     def test_pause_while_playing_replies_paused(self):
@@ -119,6 +121,7 @@ class TestPauseCommand:
 # ---------------------------------------------------------------------------
 # resume command tests
 # ---------------------------------------------------------------------------
+
 
 class TestResumeCommand:
     def test_resume_while_paused_replies_resumed(self):

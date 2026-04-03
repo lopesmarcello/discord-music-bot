@@ -1,4 +1,5 @@
 """Tests for US-004: YouTube search API endpoint."""
+
 from __future__ import annotations
 
 import asyncio
@@ -10,7 +11,6 @@ from unittest.mock import MagicMock
 from tests.conftest import (
     FakeApplication,
     FakeHTTPBadRequest,
-    FakeResponse,
 )
 
 _mock_web = sys.modules["aiohttp.web"]

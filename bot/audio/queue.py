@@ -1,4 +1,5 @@
 """Per-guild in-memory song queue."""
+
 from __future__ import annotations
 
 from typing import Optional

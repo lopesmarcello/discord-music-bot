@@ -1,11 +1,11 @@
 """Integration tests for play command (US-005)."""
+
 from __future__ import annotations
 
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 from bot.audio.resolver import AudioTrack, UnsupportedSourceError
-from bot.audio.queue import GuildQueueRegistry
 from bot.cogs.music import Music
 
 GUILD_ID = 42
@@ -14,6 +14,7 @@ GUILD_ID = 42
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_track(title="Test Song", stream_url="https://stream.example.com/audio.webm"):
     return AudioTrack(
@@ -73,6 +74,7 @@ def _make_cog(track=None, ffmpeg_source_class=None):
 # User not in voice channel
 # ---------------------------------------------------------------------------
 
+
 class TestPlayUserNotInVoice:
     def test_sends_error_when_user_not_in_voice(self):
         cog, _ = _make_cog(_make_track())
@@ -99,6 +101,7 @@ class TestPlayUserNotInVoice:
 # ---------------------------------------------------------------------------
 # Bot joins channel automatically
 # ---------------------------------------------------------------------------
+
 
 class TestPlayBotJoinsChannel:
     def test_bot_joins_users_channel(self):
@@ -145,6 +148,7 @@ class TestPlayBotJoinsChannel:
 # Resolver called with query
 # ---------------------------------------------------------------------------
 
+
 class TestPlayResolution:
     def test_resolver_called_with_query(self):
         cog, resolver = _make_cog(_make_track())
@@ -156,6 +160,7 @@ class TestPlayResolution:
 # ---------------------------------------------------------------------------
 # Queue and playback logic
 # ---------------------------------------------------------------------------
+
 
 class TestPlayQueueBehaviour:
     def test_starts_playback_immediately_when_idle(self):
@@ -234,6 +239,7 @@ class TestPlayQueueBehaviour:
 # Reply messages
 # ---------------------------------------------------------------------------
 
+
 class TestPlayMessages:
     def test_now_playing_message_when_idle(self):
         track = _make_track(title="Bohemian Rhapsody")
@@ -278,12 +284,15 @@ class TestPlayMessages:
 # Unsupported URL error handling (US-003)
 # ---------------------------------------------------------------------------
 
+
 class TestPlayUnsupportedUrl:
     def test_unsupported_url_sends_error_reply(self):
         bot = MagicMock()
         bot.loop = asyncio.new_event_loop()
         mock_resolver = MagicMock()
-        mock_resolver.resolve.side_effect = UnsupportedSourceError("Unsupported URL: https://open.spotify.com/track/abc")
+        mock_resolver.resolve.side_effect = UnsupportedSourceError(
+            "Unsupported URL: https://open.spotify.com/track/abc"
+        )
         cog = Music(bot, resolver=mock_resolver)
         ctx = _make_ctx()
         asyncio.run(cog.play(ctx, query="https://open.spotify.com/track/abc"))
@@ -295,7 +304,9 @@ class TestPlayUnsupportedUrl:
         bot = MagicMock()
         bot.loop = asyncio.new_event_loop()
         mock_resolver = MagicMock()
-        mock_resolver.resolve.side_effect = UnsupportedSourceError("Unsupported URL: https://open.spotify.com/track/abc")
+        mock_resolver.resolve.side_effect = UnsupportedSourceError(
+            "Unsupported URL: https://open.spotify.com/track/abc"
+        )
         cog = Music(bot, resolver=mock_resolver)
         ctx = _make_ctx()
         asyncio.run(cog.play(ctx, query="https://open.spotify.com/track/abc"))

@@ -1,4 +1,5 @@
 """Tests for US-001: HTTP API server embedded in the bot."""
+
 from __future__ import annotations
 
 import asyncio
@@ -57,6 +58,7 @@ class TestStartApiServer:
 
         def capturing_tcp_site(runner, host, port):
             from tests.conftest import FakeTCPSite  # noqa: PLC0415
+
             site = FakeTCPSite(runner, host, port)
             created_sites.append(site)
             return site
@@ -74,6 +76,7 @@ class TestStartApiServer:
 
         def capturing_tcp_site(runner, host, port):
             from tests.conftest import FakeTCPSite  # noqa: PLC0415
+
             captured.append((host, port))
             return FakeTCPSite(runner, host, port)
 
@@ -89,6 +92,7 @@ class TestStartApiServer:
 
         def capturing_tcp_site(runner, host, port):
             from tests.conftest import FakeTCPSite  # noqa: PLC0415
+
             captured.append((host, port))
             return FakeTCPSite(runner, host, port)
 

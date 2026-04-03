@@ -1,4 +1,5 @@
 """HTTP API server that runs alongside the Discord bot."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

@@ -1,8 +1,9 @@
 """Unit tests for VoiceManager (US-004)."""
+
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, call
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -13,7 +14,10 @@ from bot.audio.voice import VoiceManager
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_mock_voice_client(*, playing: bool = False, paused: bool = False) -> MagicMock:
+
+def _make_mock_voice_client(
+    *, playing: bool = False, paused: bool = False
+) -> MagicMock:
     """Return a mock discord.VoiceClient."""
     vc = MagicMock()
     vc.is_playing.return_value = playing
@@ -45,6 +49,7 @@ def _make_ffmpeg_source_class() -> MagicMock:
 # VoiceManager.join
 # ---------------------------------------------------------------------------
 
+
 class TestJoin:
     def test_join_connects_to_channel(self):
         channel, vc = _make_mock_channel()
@@ -71,6 +76,7 @@ class TestJoin:
 # VoiceManager.leave
 # ---------------------------------------------------------------------------
 
+
 class TestLeave:
     def test_leave_disconnects_voice_client(self):
         channel, vc = _make_mock_channel()
@@ -95,6 +101,7 @@ class TestLeave:
 # ---------------------------------------------------------------------------
 # VoiceManager.play
 # ---------------------------------------------------------------------------
+
 
 class TestPlay:
     def test_play_creates_ffmpeg_source(self):
@@ -136,6 +143,7 @@ class TestPlay:
 # ---------------------------------------------------------------------------
 # VoiceManager on_track_end callback
 # ---------------------------------------------------------------------------
+
 
 class TestOnTrackEnd:
     def test_track_end_callback_is_called_after_playback(self):
@@ -188,6 +196,7 @@ class TestOnTrackEnd:
 # VoiceManager.pause
 # ---------------------------------------------------------------------------
 
+
 class TestPause:
     def test_pause_calls_voice_client_pause(self):
         vc = _make_mock_voice_client(playing=True)
@@ -214,6 +223,7 @@ class TestPause:
 # ---------------------------------------------------------------------------
 # VoiceManager.resume
 # ---------------------------------------------------------------------------
+
 
 class TestResume:
     def test_resume_calls_voice_client_resume(self):
@@ -242,6 +252,7 @@ class TestResume:
 # VoiceManager.stop
 # ---------------------------------------------------------------------------
 
+
 class TestStop:
     def test_stop_calls_voice_client_stop(self):
         channel, vc = _make_mock_channel()
@@ -268,6 +279,7 @@ class TestStop:
 # VoiceManager.is_playing
 # ---------------------------------------------------------------------------
 
+
 class TestIsPlaying:
     def test_is_playing_returns_true_when_playing(self):
         vc = _make_mock_voice_client(playing=True)
@@ -291,6 +303,7 @@ class TestIsPlaying:
 # ---------------------------------------------------------------------------
 # VoiceManager.is_paused
 # ---------------------------------------------------------------------------
+
 
 class TestIsPaused:
     def test_is_paused_returns_true_when_paused(self):
@@ -316,10 +329,13 @@ class TestIsPaused:
 # VoiceManager._get_ffmpeg_source_class lazy import path
 # ---------------------------------------------------------------------------
 
+
 class TestGetFfmpegSourceClassLazyImport:
     def test_lazy_import_when_ffmpeg_source_class_not_provided(self):
-        """When ffmpeg_source_class is None, resolver imports discord from sys.modules."""
+        """When ffmpeg_source_class is None, resolver imports
+        discord from sys.modules."""
         from unittest.mock import patch
+
         mock_discord = MagicMock()
         with patch.dict("sys.modules", {"discord": mock_discord}):
             manager = VoiceManager()

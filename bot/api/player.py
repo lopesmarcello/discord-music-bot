@@ -1,15 +1,12 @@
 """Queue and playback API route handlers."""
+
 from __future__ import annotations
 
 import json
-import logging
 from typing import TYPE_CHECKING
-
-_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import aiohttp.web
-    from bot.services.music import MusicService
 
 
 def _get_music_cog(request: "aiohttp.web.Request"):
@@ -18,14 +15,6 @@ def _get_music_cog(request: "aiohttp.web.Request"):
     if bot is None:
         return None
     return bot.cogs.get("Music")
-
-
-def _get_service(request: "aiohttp.web.Request") -> "MusicService | None":
-    """Return the MusicService from the Music cog, or None."""
-    music = _get_music_cog(request)
-    if music is None:
-        return None
-    return music.service
 
 
 def _require_guild_id(request: "aiohttp.web.Request") -> int:
@@ -39,18 +28,6 @@ def _require_guild_id(request: "aiohttp.web.Request") -> int:
         return int(guild_id_str)
     except ValueError:
         raise aiohttp.web.HTTPBadRequest(reason="guild_id must be an integer")
-
-
-def _require_guild_membership(request: "aiohttp.web.Request", guild_id: int) -> None:
-    """Verify the authenticated user belongs to the requested guild."""
-    import aiohttp.web  # noqa: PLC0415, F401
-
-    jwt_payload = request.get("jwt_payload")
-    if jwt_payload is None:
-        return  # No JWT context (e.g., no middleware); skip check
-    user_guild_ids = jwt_payload.get("guild_ids", [])
-    if str(guild_id) not in user_guild_ids:
-        raise aiohttp.web.HTTPForbidden(reason="You are not a member of this guild")
 
 
 def _track_dict(track) -> dict:
@@ -68,24 +45,25 @@ async def handle_queue_get(request: "aiohttp.web.Request") -> "aiohttp.web.Respo
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
-    _require_guild_membership(request, guild_id)
-    svc = _get_service(request)
+    music = _get_music_cog(request)
 
-    if svc is None:
+    if music is None:
         return aiohttp.web.Response(
             text=json.dumps({"current": None, "tracks": []}),
             content_type="application/json",
         )
 
-    current = svc.current_tracks.get(guild_id)
-    queue = svc.queue_registry.get_queue(guild_id)
+    current = music._current_tracks.get(guild_id)
+    queue = music._queue_registry.get_queue(guild_id)
     tracks = queue.list()
 
     return aiohttp.web.Response(
-        text=json.dumps({
-            "current": _track_dict(current) if current is not None else None,
-            "tracks": [_track_dict(t) for t in tracks],
-        }),
+        text=json.dumps(
+            {
+                "current": _track_dict(current) if current is not None else None,
+                "tracks": [_track_dict(t) for t in tracks],
+            }
+        ),
         content_type="application/json",
     )
 
@@ -95,31 +73,31 @@ async def handle_queue_skip(request: "aiohttp.web.Request") -> "aiohttp.web.Resp
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
-    _require_guild_membership(request, guild_id)
-    svc = _get_service(request)
+    music = _get_music_cog(request)
 
-    if svc is None:
+    if music is None:
         raise aiohttp.web.HTTPServiceUnavailable(reason="Music cog not available")
 
-    vm = svc.get_voice_manager(guild_id)
+    vm = music._get_voice_manager(guild_id)
     if not vm.is_playing() and not vm.is_paused():
         raise aiohttp.web.HTTPBadRequest(reason="Nothing is currently playing")
 
-    svc.skipping[guild_id] = True
+    music._skipping[guild_id] = True
     vm.stop()
-    await svc.play_next(guild_id)
-    svc.skipping[guild_id] = False
+    await music._play_next(guild_id)
+    music._skipping[guild_id] = False
 
-    current = svc.current_tracks.get(guild_id)
-    queue = svc.queue_registry.get_queue(guild_id)
+    current = music._current_tracks.get(guild_id)
+    queue = music._queue_registry.get_queue(guild_id)
     tracks = queue.list()
-    _log.info("Skipped track in guild %s", guild_id)
     return aiohttp.web.Response(
-        text=json.dumps({
-            "skipped": True,
-            "current": _track_dict(current) if current is not None else None,
-            "tracks": [_track_dict(t) for t in tracks],
-        }),
+        text=json.dumps(
+            {
+                "skipped": True,
+                "current": _track_dict(current) if current is not None else None,
+                "tracks": [_track_dict(t) for t in tracks],
+            }
+        ),
         content_type="application/json",
     )
 
@@ -129,13 +107,12 @@ async def handle_queue_clear(request: "aiohttp.web.Request") -> "aiohttp.web.Res
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
-    _require_guild_membership(request, guild_id)
-    svc = _get_service(request)
+    music = _get_music_cog(request)
 
-    if svc is None:
+    if music is None:
         raise aiohttp.web.HTTPServiceUnavailable(reason="Music cog not available")
 
-    queue = svc.queue_registry.get_queue(guild_id)
+    queue = music._queue_registry.get_queue(guild_id)
     queue.clear()
 
     return aiohttp.web.Response(
@@ -153,10 +130,9 @@ async def handle_queue_add(
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
-    _require_guild_membership(request, guild_id)
-    svc = _get_service(request)
+    music = _get_music_cog(request)
 
-    if svc is None:
+    if music is None:
         raise aiohttp.web.HTTPServiceUnavailable(reason="Music cog not available")
 
     body = await request.json()
@@ -167,31 +143,34 @@ async def handle_queue_add(
     if _resolver_factory is not None:
         resolver = _resolver_factory()
     else:
-        resolver = svc.resolver
+        resolver = music._resolver
 
     try:
         from bot.audio.resolver import UnsupportedSourceError  # noqa: PLC0415
+
         track = resolver.resolve(url)
     except UnsupportedSourceError as exc:
         raise aiohttp.web.HTTPBadRequest(reason=str(exc))
 
-    vm = svc.get_voice_manager(guild_id)
+    vm = music._get_voice_manager(guild_id)
     if not vm.is_connected():
         raise aiohttp.web.HTTPConflict(
             reason="Bot is not in a voice channel. Use /join in Discord first."
         )
 
-    queue = svc.queue_registry.get_queue(guild_id)
+    queue = music._queue_registry.get_queue(guild_id)
     queue.add(track)
 
     if not vm.is_playing() and not vm.is_paused():
-        await svc.play_next(guild_id)
+        await music._play_next(guild_id)
 
     return aiohttp.web.Response(
-        text=json.dumps({
-            "added": True,
-            "track": _track_dict(track),
-        }),
+        text=json.dumps(
+            {
+                "added": True,
+                "track": _track_dict(track),
+            }
+        ),
         content_type="application/json",
     )
 
@@ -202,16 +181,15 @@ async def handle_playback_get(request: "aiohttp.web.Request") -> "aiohttp.web.Re
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
-    _require_guild_membership(request, guild_id)
-    svc = _get_service(request)
+    music = _get_music_cog(request)
 
-    if svc is None:
+    if music is None:
         return aiohttp.web.Response(
             text=json.dumps({"state": "stopped", "elapsed_seconds": None}),
             content_type="application/json",
         )
 
-    vm = svc.get_voice_manager(guild_id)
+    vm = music._get_voice_manager(guild_id)
     if vm.is_playing():
         state = "playing"
     elif vm.is_paused():
@@ -222,15 +200,13 @@ async def handle_playback_get(request: "aiohttp.web.Request") -> "aiohttp.web.Re
     if state == "stopped":
         elapsed_seconds = None
     elif state == "playing":
-        started_at = svc.started_at.get(guild_id)
-        offset = svc.elapsed_offset.get(guild_id, 0.0)
+        started_at = music._started_at.get(guild_id)
+        offset = music._elapsed_offset.get(guild_id, 0.0)
         elapsed_seconds = (
-            (time.time() - started_at + offset)
-            if started_at is not None
-            else None
+            (time.time() - started_at + offset) if started_at is not None else None
         )
     else:  # paused
-        elapsed_seconds = svc.elapsed_offset.get(guild_id, 0.0)
+        elapsed_seconds = music._elapsed_offset.get(guild_id, 0.0)
 
     return aiohttp.web.Response(
         text=json.dumps({"state": state, "elapsed_seconds": elapsed_seconds}),
@@ -246,22 +222,21 @@ async def handle_playback_pause(
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
-    _require_guild_membership(request, guild_id)
-    svc = _get_service(request)
+    music = _get_music_cog(request)
 
-    if svc is None:
+    if music is None:
         raise aiohttp.web.HTTPServiceUnavailable(reason="Music cog not available")
 
-    vm = svc.get_voice_manager(guild_id)
+    vm = music._get_voice_manager(guild_id)
     if not vm.is_playing():
         raise aiohttp.web.HTTPBadRequest(reason="Nothing is currently playing")
 
-    started_at = svc.started_at.get(guild_id)
+    started_at = music._started_at.get(guild_id)
     if started_at is not None:
-        svc.elapsed_offset[guild_id] = (
-            svc.elapsed_offset.get(guild_id, 0.0) + (time.time() - started_at)
+        music._elapsed_offset[guild_id] = music._elapsed_offset.get(guild_id, 0.0) + (
+            time.time() - started_at
         )
-        svc.started_at[guild_id] = None
+        music._started_at[guild_id] = None
     vm.pause()
     return aiohttp.web.Response(
         text=json.dumps({"paused": True}),
@@ -277,18 +252,17 @@ async def handle_playback_resume(
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
-    _require_guild_membership(request, guild_id)
-    svc = _get_service(request)
+    music = _get_music_cog(request)
 
-    if svc is None:
+    if music is None:
         raise aiohttp.web.HTTPServiceUnavailable(reason="Music cog not available")
 
-    vm = svc.get_voice_manager(guild_id)
+    vm = music._get_voice_manager(guild_id)
     if not vm.is_paused():
         raise aiohttp.web.HTTPBadRequest(reason="Playback is not paused")
 
     vm.resume()
-    svc.started_at[guild_id] = time.time()
+    music._started_at[guild_id] = time.time()
     return aiohttp.web.Response(
         text=json.dumps({"resumed": True}),
         content_type="application/json",
@@ -302,22 +276,21 @@ async def handle_playback_stop(
     import aiohttp.web  # noqa: PLC0415, F401
 
     guild_id = _require_guild_id(request)
-    _require_guild_membership(request, guild_id)
-    svc = _get_service(request)
+    music = _get_music_cog(request)
 
-    if svc is None:
+    if music is None:
         raise aiohttp.web.HTTPServiceUnavailable(reason="Music cog not available")
 
-    vm = svc.get_voice_manager(guild_id)
+    vm = music._get_voice_manager(guild_id)
     if not vm.is_connected():
         raise aiohttp.web.HTTPBadRequest(reason="Not in a voice channel")
 
     vm.stop()
-    svc.started_at[guild_id] = None
-    svc.elapsed_offset[guild_id] = 0.0
-    queue = svc.queue_registry.get_queue(guild_id)
+    music._started_at[guild_id] = None
+    music._elapsed_offset[guild_id] = 0.0
+    queue = music._queue_registry.get_queue(guild_id)
     queue.clear()
-    svc.current_tracks[guild_id] = None
+    music._current_tracks[guild_id] = None
     await vm.leave()
 
     return aiohttp.web.Response(

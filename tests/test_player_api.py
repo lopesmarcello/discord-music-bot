@@ -1,4 +1,5 @@
 """Tests for US-003: Queue and playback API endpoints."""
+
 from __future__ import annotations
 
 import asyncio
@@ -11,10 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 from tests.conftest import (
     FakeApplication,
     FakeHTTPBadRequest,
-    FakeHTTPException,
-    FakeHTTPForbidden,
     FakeHTTPServiceUnavailable,
-    FakeResponse,
 )
 
 _mock_web = sys.modules["aiohttp.web"]
@@ -60,43 +58,28 @@ def _make_queue(tracks=None):
     return q
 
 
-def _make_service(
-    guild_id=123,
-    current_track=None,
-    queue_tracks=None,
-    vm=None,
-):
-    """Create a mock MusicService with the given state."""
-    svc = MagicMock()
-    svc.current_tracks = {}
-    svc.started_at = {}
-    svc.elapsed_offset = {}
-    svc.skipping = {}
-    if current_track is not None:
-        svc.current_tracks[guild_id] = current_track
-
-    fake_queue = _make_queue(queue_tracks)
-    registry = MagicMock()
-    registry.get_queue.return_value = fake_queue
-    svc.queue_registry = registry
-
-    _vm = vm if vm is not None else _make_vm()
-    svc.get_voice_manager = MagicMock(return_value=_vm)
-    svc.play_next = AsyncMock()
-
-    return svc, _vm, fake_queue
-
-
 def _make_music_cog(
     guild_id=123,
     current_track=None,
     queue_tracks=None,
     vm=None,
 ):
-    """Create a mock Music cog with a mock service."""
-    svc, _vm, fake_queue = _make_service(guild_id, current_track, queue_tracks, vm)
     cog = MagicMock()
-    cog.service = svc
+    cog._current_tracks = {}
+    cog._started_at = {}
+    cog._elapsed_offset = {}
+    if current_track is not None:
+        cog._current_tracks[guild_id] = current_track
+
+    fake_queue = _make_queue(queue_tracks)
+    registry = MagicMock()
+    registry.get_queue.return_value = fake_queue
+    cog._queue_registry = registry
+
+    _vm = vm if vm is not None else _make_vm()
+    cog._get_voice_manager = MagicMock(return_value=_vm)
+    cog._play_next = AsyncMock()
+
     return cog, _vm, fake_queue
 
 
@@ -108,7 +91,7 @@ def _make_bot(music_cog=None):
     return bot
 
 
-def _make_request(guild_id=None, app_data=None, jwt_payload=None):
+def _make_request(guild_id=None, app_data=None):
     """Return a fake aiohttp Request with query params and app dict."""
     request = MagicMock()
     if guild_id is not None:
@@ -122,13 +105,6 @@ def _make_request(guild_id=None, app_data=None, jwt_payload=None):
         for k, v in app_data.items():
             app[k] = v
     request.app = app
-
-    # Support request["jwt_payload"] and request.get("jwt_payload")
-    _store = {}
-    if jwt_payload is not None:
-        _store["jwt_payload"] = jwt_payload
-    request.__getitem__ = lambda self_unused, key: _store[key]
-    request.get = lambda key, default=None: _store.get(key, default)
     return request
 
 
@@ -173,7 +149,7 @@ class TestHandleQueueGet:
 
         cog, vm, q = _make_music_cog()
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_queue_get(request))
         data = json.loads(resp.text)
         assert data["current"] is None
@@ -182,10 +158,12 @@ class TestHandleQueueGet:
     def test_returns_current_track(self):
         from bot.api.player import handle_queue_get
 
-        track = _make_track("Song A", url="http://example.com/a", duration=120, source="youtube")
+        track = _make_track(
+            "Song A", url="http://example.com/a", duration=120, source="youtube"
+        )
         cog, vm, q = _make_music_cog(guild_id=123, current_track=track)
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_queue_get(request))
         data = json.loads(resp.text)
         assert data["current"] == {
@@ -201,12 +179,16 @@ class TestHandleQueueGet:
         from bot.api.player import handle_queue_get
 
         tracks = [
-            _make_track("Song B", url="http://example.com/b", duration=200, source="youtube"),
-            _make_track("Song C", url="http://example.com/c", duration=300, source="search"),
+            _make_track(
+                "Song B", url="http://example.com/b", duration=200, source="youtube"
+            ),
+            _make_track(
+                "Song C", url="http://example.com/c", duration=300, source="search"
+            ),
         ]
         cog, vm, q = _make_music_cog(queue_tracks=tracks)
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_queue_get(request))
         data = json.loads(resp.text)
         assert len(data["tracks"]) == 2
@@ -243,27 +225,26 @@ class TestHandleQueueGet:
 
 class TestHandleQueueSkip:
     def test_skips_and_returns_next_track(self):
-        from bot.api.player import handle_queue_get, handle_queue_skip
+        from bot.api.player import handle_queue_skip
 
         next_track = _make_track("Song Next")
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        svc = cog.service
 
-        # After play_next is called, simulate it setting current track
+        # After _play_next is called, simulate it setting current track
         async def fake_play_next(guild_id):
-            svc.current_tracks[guild_id] = next_track
+            cog._current_tracks[guild_id] = next_track
 
-        svc.play_next.side_effect = fake_play_next
+        cog._play_next.side_effect = fake_play_next
 
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_queue_skip(request))
         data = json.loads(resp.text)
         assert data["skipped"] is True
         assert data["current"]["title"] == "Song Next"
         vm.stop.assert_called_once()
-        svc.play_next.assert_awaited_once_with(123)
+        cog._play_next.assert_awaited_once_with(123)
 
     def test_skips_when_paused(self):
         from bot.api.player import handle_queue_skip
@@ -271,7 +252,7 @@ class TestHandleQueueSkip:
         vm = _make_vm(is_playing=False, is_paused=True)
         cog, _, q = _make_music_cog(vm=vm)
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_queue_skip(request))
         data = json.loads(resp.text)
         assert data["skipped"] is True
@@ -283,7 +264,7 @@ class TestHandleQueueSkip:
         vm = _make_vm(is_playing=False, is_paused=False)
         cog, _, q = _make_music_cog(vm=vm)
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         try:
             asyncio.run(handle_queue_skip(request))
             assert False, "expected HTTPBadRequest"
@@ -305,17 +286,17 @@ class TestHandleQueueSkip:
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        # play_next sets current to None (empty queue)
-        cog.service.play_next.side_effect = AsyncMock()
+        # _play_next sets current to None (empty queue)
+        cog._play_next.side_effect = AsyncMock()
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_queue_skip(request))
         data = json.loads(resp.text)
         assert data["skipped"] is True
         assert data["current"] is None
 
     def test_skip_sets_skipping_flag_before_stop(self):
-        """handle_queue_skip must set skipping[guild_id] = True before vm.stop()."""
+        """handle_queue_skip must set _skipping[guild_id] = True before vm.stop()."""
         from bot.api.player import handle_queue_skip
 
         flag_at_stop_time = {}
@@ -323,52 +304,57 @@ class TestHandleQueueSkip:
         vm = _make_vm(is_playing=True)
 
         def capture_flag_on_stop():
-            flag_at_stop_time["value"] = svc.skipping.get(123, False)
+            flag_at_stop_time["value"] = cog._skipping.get(123, False)
 
         vm.stop.side_effect = capture_flag_on_stop
         cog, _, q = _make_music_cog(vm=vm)
-        svc = cog.service
-        svc.skipping = {}
+        cog._skipping = {}
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         asyncio.run(handle_queue_skip(request))
-        assert flag_at_stop_time.get("value") is True, "skipping must be True when vm.stop() is called"
+        assert flag_at_stop_time.get("value") is True, (
+            "_skipping must be True when vm.stop() is called"
+        )
 
     def test_skip_clears_skipping_flag_after_play_next(self):
-        """handle_queue_skip must clear skipping[guild_id] after play_next completes."""
+        """handle_queue_skip must clear _skipping[guild_id]
+        after _play_next completes."""
         from bot.api.player import handle_queue_skip
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        svc = cog.service
-        svc.skipping = {}
+        cog._skipping = {}
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         asyncio.run(handle_queue_skip(request))
-        assert svc.skipping.get(123, False) is False, "skipping must be False after skip completes"
+        assert cog._skipping.get(123, False) is False, (
+            "_skipping must be False after skip completes"
+        )
 
     def test_skip_response_includes_tracks(self):
-        """handle_queue_skip response must include 'tracks' so dashboard can sync immediately."""
+        """handle_queue_skip response must include 'tracks'
+        so dashboard can sync immediately."""
         from bot.api.player import handle_queue_skip
 
         next_track = _make_track("Next Song")
         queued_track = _make_track("Queued Song", url="http://example.com/queued")
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        svc = cog.service
 
-        # After play_next: current track set, one track still in queue
+        # After _play_next: current track set, one track still in queue
         async def fake_play_next(guild_id):
-            svc.current_tracks[guild_id] = next_track
+            cog._current_tracks[guild_id] = next_track
 
-        svc.play_next.side_effect = fake_play_next
+        cog._play_next.side_effect = fake_play_next
         q.list.return_value = [queued_track]
 
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_queue_skip(request))
         data = json.loads(resp.text)
-        assert "tracks" in data, "skip response must include 'tracks' for immediate dashboard sync"
+        assert "tracks" in data, (
+            "skip response must include 'tracks' for immediate dashboard sync"
+        )
         assert isinstance(data["tracks"], list)
         assert len(data["tracks"]) == 1
         assert data["tracks"][0]["title"] == "Queued Song"
@@ -379,11 +365,11 @@ class TestHandleQueueSkip:
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        # play_next leaves current_tracks[guild_id] unset (empty queue)
-        cog.service.play_next.side_effect = AsyncMock()
+        # _play_next leaves current_tracks[guild_id] unset (empty queue)
+        cog._play_next.side_effect = AsyncMock()
         q.list.return_value = []
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_queue_skip(request))
         data = json.loads(resp.text)
         assert data["skipped"] is True
@@ -391,27 +377,29 @@ class TestHandleQueueSkip:
         assert data["tracks"] == []
 
     def test_skip_response_current_matches_queue_get_after_skip(self):
-        """The 'current' in skip response must match what GET /api/queue returns immediately after."""
+        """The 'current' in skip response must match what
+        GET /api/queue returns immediately after."""
         from bot.api.player import handle_queue_get, handle_queue_skip
 
-        next_track = _make_track("Consistent Track", url="http://example.com/consistent")
+        next_track = _make_track(
+            "Consistent Track", url="http://example.com/consistent"
+        )
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        svc = cog.service
 
         async def fake_play_next(guild_id):
-            svc.current_tracks[guild_id] = next_track
+            cog._current_tracks[guild_id] = next_track
 
-        svc.play_next.side_effect = fake_play_next
+        cog._play_next.side_effect = fake_play_next
         q.list.return_value = []
 
         bot = _make_bot(cog)
-        skip_request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        skip_request = _make_request(guild_id=123, app_data={"bot": bot})
         skip_resp = asyncio.run(handle_queue_skip(skip_request))
         skip_data = json.loads(skip_resp.text)
 
         # Now GET /api/queue should return the same current
-        get_request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        get_request = _make_request(guild_id=123, app_data={"bot": bot})
         get_resp = asyncio.run(handle_queue_get(get_request))
         get_data = json.loads(get_resp.text)
 
@@ -431,7 +419,7 @@ class TestHandleQueueClear:
 
         cog, vm, q = _make_music_cog()
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_queue_clear(request))
         data = json.loads(resp.text)
         assert data == {"cleared": True}
@@ -453,7 +441,7 @@ class TestHandleQueueClear:
 # ---------------------------------------------------------------------------
 
 
-def _make_request_with_json(guild_id=None, body=None, app_data=None, jwt_payload=None):
+def _make_request_with_json(guild_id=None, body=None, app_data=None):
     """Return a fake request with JSON body support."""
     request = MagicMock()
     if guild_id is not None:
@@ -466,13 +454,6 @@ def _make_request_with_json(guild_id=None, body=None, app_data=None, jwt_payload
         for k, v in app_data.items():
             app[k] = v
     request.app = app
-
-    # Support request["jwt_payload"] and request.get("jwt_payload")
-    _store = {}
-    if jwt_payload is not None:
-        _store["jwt_payload"] = jwt_payload
-    request.__getitem__ = lambda self_unused, key: _store[key]
-    request.get = lambda key, default=None: _store.get(key, default)
     return request
 
 
@@ -493,14 +474,15 @@ class TestHandleQueueAdd:
             guild_id=123,
             body={"url": "https://youtube.com/watch?v=abc"},
             app_data={"bot": bot},
-            jwt_payload={"guild_ids": ["123"]},
         )
-        resp = asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+        resp = asyncio.run(
+            handle_queue_add(request, _resolver_factory=lambda: resolver)
+        )
         data = json.loads(resp.text)
         assert data["added"] is True
         assert data["track"]["title"] == "New Song"
         q.add.assert_called_once_with(track)
-        cog.service.play_next.assert_awaited_once_with(123)
+        cog._play_next.assert_awaited_once_with(123)
 
     def test_adds_track_without_starting_playback_when_already_playing(self):
         from bot.api.player import handle_queue_add
@@ -518,13 +500,14 @@ class TestHandleQueueAdd:
             guild_id=123,
             body={"url": "https://youtube.com/watch?v=xyz"},
             app_data={"bot": bot},
-            jwt_payload={"guild_ids": ["123"]},
         )
-        resp = asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+        resp = asyncio.run(
+            handle_queue_add(request, _resolver_factory=lambda: resolver)
+        )
         data = json.loads(resp.text)
         assert data["added"] is True
         q.add.assert_called_once_with(track)
-        cog.service.play_next.assert_not_awaited()
+        cog._play_next.assert_not_awaited()
 
     def test_adds_track_without_starting_playback_when_paused(self):
         from bot.api.player import handle_queue_add
@@ -542,12 +525,13 @@ class TestHandleQueueAdd:
             guild_id=123,
             body={"url": "https://youtube.com/watch?v=paused"},
             app_data={"bot": bot},
-            jwt_payload={"guild_ids": ["123"]},
         )
-        resp = asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+        resp = asyncio.run(
+            handle_queue_add(request, _resolver_factory=lambda: resolver)
+        )
         data = json.loads(resp.text)
         assert data["added"] is True
-        cog.service.play_next.assert_not_awaited()
+        cog._play_next.assert_not_awaited()
 
     def test_missing_url_raises_bad_request(self):
         from bot.api.player import handle_queue_add
@@ -558,7 +542,6 @@ class TestHandleQueueAdd:
             guild_id=123,
             body={},
             app_data={"bot": bot},
-            jwt_payload={"guild_ids": ["123"]},
         )
         try:
             asyncio.run(handle_queue_add(request))
@@ -575,7 +558,6 @@ class TestHandleQueueAdd:
             guild_id=123,
             body={"url": "   "},
             app_data={"bot": bot},
-            jwt_payload={"guild_ids": ["123"]},
         )
         try:
             asyncio.run(handle_queue_add(request))
@@ -596,7 +578,6 @@ class TestHandleQueueAdd:
             guild_id=123,
             body={"url": "https://unsupported.example.com/song"},
             app_data={"bot": bot},
-            jwt_payload={"guild_ids": ["123"]},
         )
         try:
             asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
@@ -651,10 +632,10 @@ class TestHandlePlaybackGet:
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        cog.service.started_at[123] = time.time()
-        cog.service.elapsed_offset[123] = 0.0
+        cog._started_at[123] = time.time()
+        cog._elapsed_offset[123] = 0.0
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_get(request))
         data = json.loads(resp.text)
         assert data["state"] == "playing"
@@ -666,10 +647,10 @@ class TestHandlePlaybackGet:
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        cog.service.started_at[123] = time.time()
-        cog.service.elapsed_offset[123] = 30.0
+        cog._started_at[123] = time.time()
+        cog._elapsed_offset[123] = 30.0
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_get(request))
         data = json.loads(resp.text)
         assert data["state"] == "playing"
@@ -680,9 +661,9 @@ class TestHandlePlaybackGet:
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        # started_at not set for this guild — falls back to None
+        # _started_at not set for this guild — falls back to None
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_get(request))
         data = json.loads(resp.text)
         assert data["state"] == "playing"
@@ -693,9 +674,9 @@ class TestHandlePlaybackGet:
 
         vm = _make_vm(is_playing=False, is_paused=True)
         cog, _, q = _make_music_cog(vm=vm)
-        cog.service.elapsed_offset[123] = 45.5
+        cog._elapsed_offset[123] = 45.5
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_get(request))
         data = json.loads(resp.text)
         assert data["state"] == "paused"
@@ -707,7 +688,7 @@ class TestHandlePlaybackGet:
         vm = _make_vm(is_playing=False, is_paused=False)
         cog, _, q = _make_music_cog(vm=vm)
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_get(request))
         data = json.loads(resp.text)
         assert data["state"] == "stopped"
@@ -726,7 +707,7 @@ class TestHandlePlaybackPause:
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_pause(request))
         data = json.loads(resp.text)
         assert data == {"paused": True}
@@ -737,27 +718,27 @@ class TestHandlePlaybackPause:
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        cog.service.started_at[123] = time.time() - 10.0  # 10 seconds into track
-        cog.service.elapsed_offset[123] = 0.0
+        cog._started_at[123] = time.time() - 10.0  # 10 seconds into track
+        cog._elapsed_offset[123] = 0.0
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         asyncio.run(handle_playback_pause(request))
         # started_at should be cleared and offset should be ~10s
-        assert cog.service.started_at.get(123) is None
-        assert cog.service.elapsed_offset.get(123, 0.0) >= 9.0
+        assert cog._started_at.get(123) is None
+        assert cog._elapsed_offset.get(123, 0.0) >= 9.0
 
     def test_pause_with_existing_offset(self):
         from bot.api.player import handle_playback_pause
 
         vm = _make_vm(is_playing=True)
         cog, _, q = _make_music_cog(vm=vm)
-        cog.service.started_at[123] = time.time() - 5.0
-        cog.service.elapsed_offset[123] = 20.0  # already accumulated 20s
+        cog._started_at[123] = time.time() - 5.0
+        cog._elapsed_offset[123] = 20.0  # already accumulated 20s
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         asyncio.run(handle_playback_pause(request))
         # offset should be ~25s
-        assert cog.service.elapsed_offset.get(123, 0.0) >= 24.0
+        assert cog._elapsed_offset.get(123, 0.0) >= 24.0
 
     def test_pause_when_not_playing_raises_bad_request(self):
         from bot.api.player import handle_playback_pause
@@ -765,7 +746,7 @@ class TestHandlePlaybackPause:
         vm = _make_vm(is_playing=False)
         cog, _, q = _make_music_cog(vm=vm)
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         try:
             asyncio.run(handle_playback_pause(request))
             assert False, "expected HTTPBadRequest"
@@ -795,7 +776,7 @@ class TestHandlePlaybackResume:
         vm = _make_vm(is_paused=True)
         cog, _, q = _make_music_cog(vm=vm)
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_resume(request))
         data = json.loads(resp.text)
         assert data == {"resumed": True}
@@ -808,10 +789,10 @@ class TestHandlePlaybackResume:
         cog, _, q = _make_music_cog(vm=vm)
         before = time.time()
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         asyncio.run(handle_playback_resume(request))
         after = time.time()
-        started_at = cog.service.started_at.get(123)
+        started_at = cog._started_at.get(123)
         assert started_at is not None
         assert before <= started_at <= after
 
@@ -821,7 +802,7 @@ class TestHandlePlaybackResume:
         vm = _make_vm(is_paused=False)
         cog, _, q = _make_music_cog(vm=vm)
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         try:
             asyncio.run(handle_playback_resume(request))
             assert False, "expected HTTPBadRequest"
@@ -850,18 +831,18 @@ class TestHandlePlaybackStop:
 
         vm = _make_vm(is_connected=True)
         cog, _, q = _make_music_cog(vm=vm)
-        cog.service.started_at[123] = time.time()
-        cog.service.elapsed_offset[123] = 15.0
+        cog._started_at[123] = time.time()
+        cog._elapsed_offset[123] = 15.0
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         resp = asyncio.run(handle_playback_stop(request))
         data = json.loads(resp.text)
         assert data == {"stopped": True}
         vm.stop.assert_called_once()
         q.clear.assert_called_once()
-        assert cog.service.current_tracks.get(123) is None
-        assert cog.service.started_at.get(123) is None
-        assert cog.service.elapsed_offset.get(123) == 0.0
+        assert cog._current_tracks.get(123) is None
+        assert cog._started_at.get(123) is None
+        assert cog._elapsed_offset.get(123) == 0.0
         vm.leave.assert_awaited_once()
 
     def test_stop_when_not_connected_raises_bad_request(self):
@@ -870,7 +851,7 @@ class TestHandlePlaybackStop:
         vm = _make_vm(is_connected=False)
         cog, _, q = _make_music_cog(vm=vm)
         bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
+        request = _make_request(guild_id=123, app_data={"bot": bot})
         try:
             asyncio.run(handle_playback_stop(request))
             assert False, "expected HTTPBadRequest"
@@ -915,33 +896,3 @@ class TestCreateAppIncludesPlayerRoutes:
 
         app = create_app()
         assert app.get("bot") is None
-
-
-# ---------------------------------------------------------------------------
-# Guild authorization
-# ---------------------------------------------------------------------------
-
-
-class TestGuildAuthorization:
-    def test_request_to_wrong_guild_raises_forbidden(self):
-        from bot.api.player import handle_queue_get
-
-        # User belongs to guild "999" but requests guild "123"
-        cog, vm, q = _make_music_cog()
-        bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["999"]})
-        try:
-            asyncio.run(handle_queue_get(request))
-            assert False, "expected HTTPForbidden"
-        except FakeHTTPForbidden:
-            pass
-
-    def test_request_to_own_guild_succeeds(self):
-        from bot.api.player import handle_queue_get
-
-        cog, vm, q = _make_music_cog()
-        bot = _make_bot(cog)
-        request = _make_request(guild_id=123, app_data={"bot": bot}, jwt_payload={"guild_ids": ["123"]})
-        resp = asyncio.run(handle_queue_get(request))
-        data = json.loads(resp.text)
-        assert data["current"] is None  # success, not forbidden

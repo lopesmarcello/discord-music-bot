@@ -1,4 +1,5 @@
 """Tests for US-001 (guild-picker PRD): GET /api/guilds endpoint."""
+
 from __future__ import annotations
 
 import asyncio
@@ -6,7 +7,7 @@ import json
 import sys
 from unittest.mock import MagicMock
 
-from tests.conftest import FakeApplication, FakeResponse
+from tests.conftest import FakeApplication
 
 _mock_web = sys.modules["aiohttp.web"]
 

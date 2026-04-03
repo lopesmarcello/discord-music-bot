@@ -3,6 +3,7 @@
 Sets up sys.modules stubs for packages not installed in the test environment
 (aiohttp, jwt) before any test file is imported.
 """
+
 from __future__ import annotations
 
 import json
@@ -125,7 +126,9 @@ mock_web.HTTPConflict = FakeHTTPConflict
 mock_web.HTTPServiceUnavailable = FakeHTTPServiceUnavailable
 mock_web.HTTPException = FakeHTTPException
 mock_web.Response = FakeResponse
-mock_web.middleware = lambda fn: fn  # pass-through: aiohttp.web.middleware is a no-op decorator
+mock_web.middleware = lambda fn: (
+    fn
+)  # pass-through: aiohttp.web.middleware is a no-op decorator
 
 mock_aiohttp = MagicMock()
 mock_aiohttp.web = mock_web
@@ -150,12 +153,14 @@ class _FakeJWTModule:
     @staticmethod
     def encode(payload: dict, secret: str, algorithm: str = "HS256") -> str:
         import base64
+
         data = json.dumps(payload).encode()
         return base64.urlsafe_b64encode(data).decode() + "." + secret[:4]
 
     @staticmethod
     def decode(token: str, secret: str, algorithms=None) -> dict:
         import base64
+
         try:
             b64_part = token.rsplit(".", 1)[0]
             data = base64.urlsafe_b64decode(b64_part + "==")

@@ -1,4 +1,5 @@
 """Conftest for integration tests: mock discord before cog imports."""
+
 from __future__ import annotations
 
 import sys
@@ -8,6 +9,7 @@ from unittest.mock import MagicMock
 # ---------------------------------------------------------------------------
 # Stub discord classes needed by the Music cog
 # ---------------------------------------------------------------------------
+
 
 class _FakeCog:
     """Minimal Cog base class stub."""
@@ -19,8 +21,10 @@ class _FakeContext:
 
 def _fake_hybrid_command(*args, **kwargs):
     """Decorator stub that passes the function through unchanged."""
+
     def decorator(func):
         return func
+
     return decorator
 
 

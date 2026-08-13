@@ -26,17 +26,22 @@ jobs:
               ref: 'main',
               per_page: 100,
             });
-            const ciRuns = checks.check_runs.filter(r =>
-              ['Test Bot (Python 3.11)', 'Lint Dashboard (Node.js 20)', 'Validate Docker Builds'].includes(r.name)
-            );
+            const requiredChecks = [
+              'Test Bot (Python 3.11)',
+              'Lint Dashboard',
+              'Validate Docker Builds',
+            ];
+            const ciRuns = checks.check_runs.filter(r => requiredChecks.includes(r.name));
+            const foundChecks = new Set(ciRuns.map(r => r.name));
+            const missing = requiredChecks.filter(name => !foundChecks.has(name));
             const failed = ciRuns.filter(r => r.conclusion !== 'success');
-            if (failed.length > 0) {
+            if (missing.length > 0) {
+              core.setFailed(`Missing CI checks on main: ${missing.join(', ')}`);
+            } else if (failed.length > 0) {
               const names = failed.map(r => `${r.name}: ${r.conclusion}`).join(', ');
               core.setFailed(`CI checks not passing on main: ${names}`);
-            } else if (ciRuns.length === 0) {
-              core.setFailed('No CI runs found on main. Push to main first to trigger CI.');
             } else {
-              core.info(`All ${ciRuns.length} CI checks passing on main.`);
+              core.info('All required CI checks passing on main.');
             }
 
   deploy:

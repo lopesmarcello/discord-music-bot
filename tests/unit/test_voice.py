@@ -191,6 +191,24 @@ class TestOnTrackEnd:
         after_cb = vc.play.call_args[1]["after"]
         after_cb(None)  # Should not raise even without a callback registered
 
+    def test_stale_track_end_callback_is_ignored_after_stop_and_new_play(self):
+        channel, vc = _make_mock_channel()
+        ffmpeg_class = _make_ffmpeg_source_class()
+        manager = VoiceManager(ffmpeg_source_class=ffmpeg_class)
+        on_end = MagicMock()
+        manager.set_on_track_end(on_end)
+
+        asyncio.run(manager.join(channel))
+        asyncio.run(manager.play("https://stream.example.com/first.webm"))
+        stale_after = vc.play.call_args[1]["after"]
+        vc.stop.side_effect = lambda: stale_after(None)
+
+        manager.stop()
+        asyncio.run(manager.play("https://stream.example.com/second.webm"))
+        stale_after(None)
+
+        on_end.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # VoiceManager.pause

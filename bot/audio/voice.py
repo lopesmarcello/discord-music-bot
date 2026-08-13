@@ -16,6 +16,7 @@ class VoiceManager:
         self._voice_client = None
         self._on_track_end: Optional[Callable] = None
         self._ffmpeg_source_class = ffmpeg_source_class
+        self._playback_generation = 0
 
     async def join(self, channel: object) -> None:
         """Connect to a voice channel."""
@@ -38,9 +39,14 @@ class VoiceManager:
             before_options=self.FFMPEG_BEFORE_OPTIONS,
             options=self.FFMPEG_OPTIONS,
         )
+        self._playback_generation += 1
+        generation = self._playback_generation
 
         def _after(error: Optional[Exception]) -> None:
-            if self._on_track_end is not None:
+            if (
+                generation == self._playback_generation
+                and self._on_track_end is not None
+            ):
                 self._on_track_end(error)
 
         self._voice_client.play(source, after=_after)
@@ -57,6 +63,7 @@ class VoiceManager:
 
     def stop(self) -> None:
         """Stop audio without disconnecting."""
+        self._playback_generation += 1
         if self._voice_client is not None:
             self._voice_client.stop()
 

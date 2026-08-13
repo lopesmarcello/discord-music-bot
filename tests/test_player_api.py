@@ -541,6 +541,32 @@ class TestHandleQueueAdd:
 
         resolver.resolve.assert_not_called()
 
+    def test_disconnect_during_resolve_rejects_without_queuing(self):
+        from bot.api.player import handle_queue_add
+
+        track = _make_track("New Song")
+        resolver = MagicMock()
+        vm = _make_vm()
+
+        def disconnect_then_resolve(url):
+            vm.is_connected.return_value = False
+            return track
+
+        resolver.resolve.side_effect = disconnect_then_resolve
+        cog, _, q = _make_music_cog(vm=vm)
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "https://youtube.com/watch?v=abc"},
+            app_data={"bot": _make_bot(cog)},
+            jwt_payload={"guild_ids": ["123"]},
+        )
+
+        with pytest.raises(FakeHTTPConflict):
+            asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+
+        q.add.assert_not_called()
+        cog.service.play_next.assert_not_awaited()
+
     def test_resolve_runs_outside_event_loop_thread(self):
         from bot.api.player import handle_queue_add
 

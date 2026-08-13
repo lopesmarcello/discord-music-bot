@@ -118,6 +118,29 @@ class TestPlayBotJoinsChannel:
 
         assert resolver_thread[0] != event_loop_thread
 
+    def test_disconnect_during_resolve_does_not_start_track(self):
+        track = _make_track()
+        cog, resolver = _make_cog(track)
+        vm = MagicMock()
+        vm.is_connected.return_value = True
+        vm.is_playing.return_value = False
+        vm.is_paused.return_value = False
+        vm.play = AsyncMock()
+        cog.service.voice_managers[GUILD_ID] = vm
+
+        def disconnect_then_resolve(query):
+            vm.is_connected.return_value = False
+            return track
+
+        resolver.resolve.side_effect = disconnect_then_resolve
+        ctx = _make_ctx()
+
+        asyncio.run(cog.play(ctx, query="test song"))
+
+        ctx.send.assert_awaited_once_with("I'm not in a voice channel.")
+        assert cog.service.current_tracks.get(GUILD_ID) is None
+        vm.play.assert_not_awaited()
+
     def test_bot_joins_users_channel(self):
         cog, _ = _make_cog(_make_track())
         vc = _make_vc()

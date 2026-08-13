@@ -116,6 +116,9 @@ class Music(commands.Cog):
                 " e.g. `/play artist - song title`."
             )
             return
+        if not vm.is_connected():
+            await ctx.send("I'm not in a voice channel.")
+            return
         queue = self.service.queue_registry.get_queue(ctx.guild.id)
         queue.add(track)
 

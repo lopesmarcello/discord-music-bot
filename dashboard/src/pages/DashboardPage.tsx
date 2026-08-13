@@ -4,7 +4,6 @@ import { fetchGuilds } from "../api";
 import AppShell from "../components/AppShell";
 import Sidebar from "../components/Sidebar";
 import type { SidebarView } from "../components/Sidebar";
-import PlaybackControls from "../components/PlaybackControls";
 import PlayerBar from "../components/PlayerBar";
 import QueueView from "../components/QueueView";
 import SearchBar from "../components/SearchBar";
@@ -66,15 +65,7 @@ export default function DashboardPage({
         }}
       >
         {activeView === "queue" ? (
-          <>
-            <PlaybackControls
-              guildId={guildId}
-              refreshTrigger={queueRefreshKey}
-              onStopped={() => setQueueRefreshKey((k) => k + 1)}
-            />
-            <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "24px 0" }} />
-            <QueueView guildId={guildId} refreshTrigger={queueRefreshKey} />
-          </>
+          <QueueView guildId={guildId} refreshTrigger={queueRefreshKey} />
         ) : (
           <SearchBar
             guildId={guildId}

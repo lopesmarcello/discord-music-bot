@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "test:search-a11y": "vite build --ssr tests/search-accessibility.test.tsx --outDir node_modules/.cache/search-a11y --emptyOutDir && node node_modules/.cache/search-a11y/search-accessibility.test.js",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {

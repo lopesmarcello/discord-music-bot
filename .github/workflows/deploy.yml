@@ -28,7 +28,7 @@ jobs:
             });
             const requiredChecks = [
               'Test Bot (Python 3.11)',
-              'Lint Dashboard (Node.js 20)',
+              'Lint Dashboard',
               'Validate Docker Builds',
             ];
             const ciRuns = checks.check_runs.filter(r => requiredChecks.includes(r.name));

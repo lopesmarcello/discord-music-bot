@@ -145,12 +145,27 @@ sys.modules.setdefault("aiohttp.web", mock_web)
 # ---------------------------------------------------------------------------
 
 
-class FakeJWTDecodeError(Exception):
+class FakeJWTInvalidTokenError(Exception):
+    pass
+
+
+class FakeJWTDecodeError(FakeJWTInvalidTokenError):
+    pass
+
+
+class FakeJWTExpiredSignatureError(FakeJWTInvalidTokenError):
+    pass
+
+
+class FakeJWTInvalidSignatureError(FakeJWTDecodeError):
     pass
 
 
 class _FakeJWTModule:
+    InvalidTokenError = FakeJWTInvalidTokenError
     DecodeError = FakeJWTDecodeError
+    ExpiredSignatureError = FakeJWTExpiredSignatureError
+    InvalidSignatureError = FakeJWTInvalidSignatureError
 
     @staticmethod
     def encode(payload: dict, secret: str, algorithm: str = "HS256") -> str:

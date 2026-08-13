@@ -7,6 +7,7 @@ import json
 import sys
 import urllib.parse
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 # Stubs for aiohttp and jwt are registered in tests/conftest.py before this
@@ -159,13 +160,18 @@ class TestHandleAuthDiscord:
     def test_redirect_uses_browser_bound_state(self):
         import pytest
 
+        issued_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
         req = _make_request(path="/auth/discord", query={"guild_id": "111222333"})
         env = {
             "JWT_SECRET": "secret",
             "DISCORD_CLIENT_ID": "client123",
             "DISCORD_REDIRECT_URI": "http://localhost:3000/auth/callback",
         }
-        with patch.dict("os.environ", env):
+        with (
+            patch.dict("os.environ", env),
+            patch("bot.api.auth.datetime") as mock_datetime,
+        ):
+            mock_datetime.now.return_value = issued_at
             with pytest.raises(FakeHTTPFound) as exc_info:
                 asyncio.run(handle_auth_discord(req))
             parsed = urllib.parse.urlparse(exc_info.value.location)
@@ -173,6 +179,7 @@ class TestHandleAuthDiscord:
             state = decode_jwt(params["state"])
         assert state["guild_id"] == "111222333"
         assert state["nonce"] == exc_info.value._cookies["oauth_state"]
+        assert state["exp"] - int(issued_at.timestamp()) == 600
         assert exc_info.value._cookie_options["oauth_state"]["httponly"] is True
 
     def test_redirect_contains_client_id(self):
@@ -210,6 +217,23 @@ class TestHandleAuthDiscord:
 
 
 class TestHandleAuthCallback:
+    def _assert_state_decode_error_rejected(self, error):
+        import pytest
+
+        req = _make_request(
+            path="/auth/callback",
+            cookies={"oauth_state": "nonce"},
+            query={"code": "valid_code", "state": "invalid-state"},
+        )
+        env = {"JWT_SECRET": "secret", "DASHBOARD_URL": "http://localhost:3000"}
+        with (
+            patch.dict("os.environ", env),
+            patch.object(sys.modules["jwt"], "decode", side_effect=error),
+        ):
+            with pytest.raises(FakeHTTPFound) as exc_info:
+                asyncio.run(handle_auth_callback(req))
+        assert "error=invalid_state" in exc_info.value.location
+
     def test_missing_code_redirects_error(self):
         import pytest
 
@@ -241,6 +265,18 @@ class TestHandleAuthCallback:
             with pytest.raises(FakeHTTPFound) as exc_info:
                 asyncio.run(handle_auth_callback(req))
         assert "error=invalid_state" in exc_info.value.location
+
+    def test_rejects_expired_state(self):
+        jwt = sys.modules["jwt"]
+        self._assert_state_decode_error_rejected(
+            jwt.ExpiredSignatureError("Signature has expired")
+        )
+
+    def test_rejects_tampered_state(self):
+        jwt = sys.modules["jwt"]
+        self._assert_state_decode_error_rejected(
+            jwt.InvalidSignatureError("Signature verification failed")
+        )
 
     def test_successful_login_sets_cookie(self):
         import pytest

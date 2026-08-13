@@ -45,7 +45,7 @@ Discord API
 
 - Python 3.11+
 - FFmpeg (must be on `PATH`)
-- Node.js 18+ (only needed to build the dashboard outside Docker)
+- Node.js 20.19+ (only needed to build the dashboard outside Docker)
 - Docker + Compose plugin (recommended for deployment)
 
 ## Quick Start (Local Development)

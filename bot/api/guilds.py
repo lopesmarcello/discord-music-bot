@@ -38,7 +38,7 @@ async def handle_guilds_get(request: "aiohttp.web.Request") -> "aiohttp.web.Resp
         {
             "id": str(guild.id),
             "name": guild.name,
-            "icon": guild.icon,
+            "icon": guild.icon.key if guild.icon else None,
         }
         for guild in bot_guilds
     ]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import TYPE_CHECKING
@@ -51,7 +52,7 @@ async def handle_search(
             resolver = AudioResolver()
 
     try:
-        results = resolver.search(q, max_results=limit)
+        results = await asyncio.to_thread(resolver.search, q, max_results=limit)
     except Exception as exc:
         _log.warning("Search failed for query %r: %s", q, exc)
         return aiohttp.web.Response(

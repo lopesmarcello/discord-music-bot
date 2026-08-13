@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from unittest.mock import AsyncMock, MagicMock
 
 from bot.audio.resolver import AudioTrack, UnsupportedSourceError
@@ -104,6 +105,42 @@ class TestPlayUserNotInVoice:
 
 
 class TestPlayBotJoinsChannel:
+    def test_resolve_runs_outside_event_loop_thread(self):
+        track = _make_track()
+        cog, resolver = _make_cog(track)
+        resolver_thread = []
+        resolver.resolve.side_effect = lambda query: (
+            resolver_thread.append(threading.get_ident()) or track
+        )
+        event_loop_thread = threading.get_ident()
+
+        asyncio.run(cog.play(_make_ctx(), query="test song"))
+
+        assert resolver_thread[0] != event_loop_thread
+
+    def test_disconnect_during_resolve_does_not_start_track(self):
+        track = _make_track()
+        cog, resolver = _make_cog(track)
+        vm = MagicMock()
+        vm.is_connected.return_value = True
+        vm.is_playing.return_value = False
+        vm.is_paused.return_value = False
+        vm.play = AsyncMock()
+        cog.service.voice_managers[GUILD_ID] = vm
+
+        def disconnect_then_resolve(query):
+            vm.is_connected.return_value = False
+            return track
+
+        resolver.resolve.side_effect = disconnect_then_resolve
+        ctx = _make_ctx()
+
+        asyncio.run(cog.play(ctx, query="test song"))
+
+        ctx.send.assert_awaited_once_with("I'm not in a voice channel.")
+        assert cog.service.current_tracks.get(GUILD_ID) is None
+        vm.play.assert_not_awaited()
+
     def test_bot_joins_users_channel(self):
         cog, _ = _make_cog(_make_track())
         vc = _make_vc()

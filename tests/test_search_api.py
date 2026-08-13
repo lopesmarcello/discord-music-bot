@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import threading
 from unittest.mock import MagicMock
 
 # Shared stubs already injected via tests/conftest.py (aiohttp, jwt).
@@ -124,6 +125,25 @@ class TestHandleSearchValidation:
 
 
 class TestHandleSearchWithCog:
+    def test_search_runs_outside_event_loop_thread(self):
+        from bot.api.search import handle_search
+
+        resolver = _make_resolver()
+        resolver_thread = []
+        resolver.search.side_effect = lambda *args, **kwargs: (
+            resolver_thread.append(threading.get_ident()) or []
+        )
+        request = _make_request(
+            query_params={"q": "test"},
+            app_data={"bot": _make_bot(_make_music_cog(resolver))},
+        )
+        event_loop_thread = threading.get_ident()
+
+        asyncio.run(handle_search(request))
+
+        assert len(resolver_thread) == 1
+        assert resolver_thread[0] != event_loop_thread
+
     def test_returns_results_from_music_cog_resolver(self):
         from bot.api.search import handle_search
 

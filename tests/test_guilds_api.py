@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from tests.conftest import FakeApplication
@@ -67,8 +68,8 @@ class TestHandleGuildsGet:
 
     def test_returns_guild_list(self):
         """Returns guilds with id, name, and icon fields."""
-        g1 = _make_guild(guild_id=111, name="Alpha", icon="hash1")
-        g2 = _make_guild(guild_id=222, name="Beta", icon="hash2")
+        g1 = _make_guild(guild_id=111, name="Alpha", icon=SimpleNamespace(key="hash1"))
+        g2 = _make_guild(guild_id=222, name="Beta", icon=SimpleNamespace(key="hash2"))
         bot = _make_bot(guilds=[g1, g2])
         req = _make_request(bot=bot, jwt_payload={"guild_ids": ["111", "222"]})
         resp = asyncio.run(handle_guilds_get(req))
@@ -79,7 +80,7 @@ class TestHandleGuildsGet:
 
     def test_guild_id_returned_as_string(self):
         """Guild IDs are serialised as strings (not integers)."""
-        g = _make_guild(guild_id=999999999999)
+        g = _make_guild(guild_id=999999999999, icon=None)
         bot = _make_bot(guilds=[g])
         req = _make_request(bot=bot, jwt_payload={"guild_ids": ["999999999999"]})
         resp = asyncio.run(handle_guilds_get(req))

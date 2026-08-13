@@ -228,7 +228,7 @@ Each server also needs a `.env` file in the deploy path with all required variab
 To enforce CI checks on `main`, enable branch protection in **GitHub → Settings → Branches**:
 
 - Check **Require status checks to pass before merging**
-- Add `Test Bot (Python 3.11)`, `Lint Dashboard (Node.js 20)`, and `Validate Docker Builds` as required status checks
+- Add `Test Bot (Python 3.11)`, `Lint Dashboard`, and `Validate Docker Builds` as required status checks
 - Check **Require branches to be up to date before merging**
 
 ---

@@ -24,8 +24,6 @@ def create_bot() -> commands.Bot:
 
     @bot.event
     async def on_ready() -> None:
-        for guild in bot.guilds:
-            await bot.tree.sync(guild=guild)
         _log.info("Logged in as %s (ID: %s)", bot.user, bot.user.id)
 
     # Load cogs
@@ -33,6 +31,7 @@ def create_bot() -> commands.Bot:
         from bot.cogs.music import Music  # noqa: PLC0415
 
         await bot.add_cog(Music(bot))
+        await bot.tree.sync()
 
     bot.setup_hook = setup_hook  # type: ignore[method-assign]
     return bot

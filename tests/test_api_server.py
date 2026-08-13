@@ -122,17 +122,31 @@ class TestHealthEndpoint:
         routes = {(method, path) for method, path, _ in app.router.routes}
         assert ("GET", "/health") in routes
 
-    def test_health_returns_ok_without_bot(self):
+    def test_health_returns_unavailable_without_bot(self):
         from unittest.mock import MagicMock  # noqa: PLC0415
 
         request = MagicMock()
         request.app = _FakeApplication()
         resp = asyncio.run(handle_health(request))
         data = json.loads(resp.text)
-        assert data["status"] == "ok"
-        assert data["bot_ready"] is False
+        assert resp.status == 503
+        assert data == {"status": "unavailable", "bot_ready": False}
 
-    def test_health_returns_bot_ready_when_bot_present(self):
+    def test_health_returns_unavailable_when_bot_not_ready(self):
+        from unittest.mock import MagicMock  # noqa: PLC0415
+
+        bot = MagicMock()
+        bot.is_ready.return_value = False
+        request = MagicMock()
+        app = _FakeApplication()
+        app["bot"] = bot
+        request.app = app
+        resp = asyncio.run(handle_health(request))
+        data = json.loads(resp.text)
+        assert resp.status == 503
+        assert data == {"status": "unavailable", "bot_ready": False}
+
+    def test_health_returns_ok_when_bot_ready(self):
         from unittest.mock import MagicMock  # noqa: PLC0415
 
         bot = MagicMock()
@@ -143,5 +157,5 @@ class TestHealthEndpoint:
         request.app = app
         resp = asyncio.run(handle_health(request))
         data = json.loads(resp.text)
-        assert data["status"] == "ok"
-        assert data["bot_ready"] is True
+        assert resp.status == 200
+        assert data == {"status": "ok", "bot_ready": True}

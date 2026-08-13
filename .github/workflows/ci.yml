@@ -55,6 +55,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Check guild picker accessibility
+        run: npm run check:guild-picker-a11y
+
   build-docker:
     name: Validate Docker Builds
     runs-on: ubuntu-latest

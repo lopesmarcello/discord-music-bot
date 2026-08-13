@@ -55,7 +55,7 @@ export default function GuildPickerPage({ user, onLogout }: GuildPickerPageProps
   );
 }
 
-function GuildCard({ guild, onClick }: { guild: Guild; onClick: () => void }) {
+export function GuildCard({ guild, onClick }: { guild: Guild; onClick: () => void }) {
   const [hovered, setHovered] = useState(false);
 
   const iconUrl = guild.icon
@@ -65,7 +65,9 @@ function GuildCard({ guild, onClick }: { guild: Guild; onClick: () => void }) {
   const initial = guild.name.charAt(0).toUpperCase();
 
   return (
-    <div
+    <button
+      type="button"
+      aria-label={guild.name}
       style={{
         ...styles.card,
         ...(hovered ? styles.cardHover : {}),
@@ -75,12 +77,12 @@ function GuildCard({ guild, onClick }: { guild: Guild; onClick: () => void }) {
       onMouseLeave={() => setHovered(false)}
     >
       {iconUrl ? (
-        <img src={iconUrl} alt={guild.name} style={styles.guildIcon} />
+        <img src={iconUrl} alt="" style={styles.guildIcon} />
       ) : (
-        <div style={styles.guildInitial}>{initial}</div>
+        <div aria-hidden="true" style={styles.guildInitial}>{initial}</div>
       )}
       <span style={styles.guildName}>{guild.name}</span>
-    </div>
+    </button>
   );
 }
 
@@ -102,6 +104,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
   },
   card: {
+    font: 'inherit',
     background: 'var(--bg-surface)',
     border: '1px solid var(--border)',
     borderRadius: 12,

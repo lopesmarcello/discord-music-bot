@@ -55,6 +55,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Check playback controls
+        run: npm run check:single-playback-controls
+
   build-docker:
     name: Validate Docker Builds
     runs-on: ubuntu-latest

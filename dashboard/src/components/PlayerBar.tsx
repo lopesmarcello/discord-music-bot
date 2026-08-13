@@ -7,11 +7,32 @@ interface PlayerBarProps {
   onQueueChanged?: () => void;
 }
 
+export function PlayerBarError({ message }: { message: string | null }) {
+  if (!message) return null;
+
+  return (
+    <div
+      role="alert"
+      style={{
+        color: '#f87171',
+        fontSize: 12,
+        marginTop: 2,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+
 export default function PlayerBar({ guildId, onQueueChanged }: PlayerBarProps) {
   const [playbackState, setPlaybackState] = useState<PlaybackState>('stopped');
   const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(() => {
     Promise.all([fetchPlayback(guildId), fetchQueue(guildId)])
@@ -40,21 +61,26 @@ export default function PlayerBar({ guildId, onQueueChanged }: PlayerBarProps) {
   }, [playbackState]);
 
   async function handlePlayPause() {
+    const isPausing = playbackState === 'playing';
     setBusy(true);
+    setError(null);
     try {
-      if (playbackState === 'playing') {
+      if (isPausing) {
         await pausePlayback(guildId);
       } else {
         await resumePlayback(guildId);
       }
       fetchData();
-    } catch { /* ignore */ } finally {
+    } catch {
+      setError(isPausing ? 'Pause failed.' : 'Resume failed.');
+    } finally {
       setBusy(false);
     }
   }
 
   async function handleSkip() {
     setBusy(true);
+    setError(null);
     try {
       // Use the skip response to update state immediately (US-002).
       // Do NOT call fetchData() here — it races with the backend's transient
@@ -70,11 +96,14 @@ export default function PlayerBar({ guildId, onQueueChanged }: PlayerBarProps) {
 
   async function handleStop() {
     setBusy(true);
+    setError(null);
     try {
       await stopPlayback(guildId);
       fetchData();
       onQueueChanged?.();
-    } catch { /* ignore */ } finally {
+    } catch {
+      setError('Stop failed.');
+    } finally {
       setBusy(false);
     }
   }
@@ -141,6 +170,7 @@ export default function PlayerBar({ guildId, onQueueChanged }: PlayerBarProps) {
               </div>
             </>
           )}
+          <PlayerBarError message={error} />
         </div>
       </div>
 

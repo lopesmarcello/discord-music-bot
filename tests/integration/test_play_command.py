@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from unittest.mock import AsyncMock, MagicMock
 
 from bot.audio.resolver import AudioTrack, UnsupportedSourceError
@@ -104,6 +105,19 @@ class TestPlayUserNotInVoice:
 
 
 class TestPlayBotJoinsChannel:
+    def test_resolve_runs_outside_event_loop_thread(self):
+        track = _make_track()
+        cog, resolver = _make_cog(track)
+        resolver_thread = []
+        resolver.resolve.side_effect = lambda query: (
+            resolver_thread.append(threading.get_ident()) or track
+        )
+        event_loop_thread = threading.get_ident()
+
+        asyncio.run(cog.play(_make_ctx(), query="test song"))
+
+        assert resolver_thread[0] != event_loop_thread
+
     def test_bot_joins_users_channel(self):
         cog, _ = _make_cog(_make_track())
         vc = _make_vc()

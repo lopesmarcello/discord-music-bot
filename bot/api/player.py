@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import TYPE_CHECKING
@@ -174,18 +175,18 @@ async def handle_queue_add(
     else:
         resolver = svc.resolver
 
-    try:
-        from bot.audio.resolver import UnsupportedSourceError  # noqa: PLC0415
-
-        track = resolver.resolve(url)
-    except UnsupportedSourceError as exc:
-        raise aiohttp.web.HTTPBadRequest(reason=str(exc))
-
     vm = svc.get_voice_manager(guild_id)
     if not vm.is_connected():
         raise aiohttp.web.HTTPConflict(
             reason="Bot is not in a voice channel. Use /join in Discord first."
         )
+
+    try:
+        from bot.audio.resolver import UnsupportedSourceError  # noqa: PLC0415
+
+        track = await asyncio.to_thread(resolver.resolve, url)
+    except UnsupportedSourceError as exc:
+        raise aiohttp.web.HTTPBadRequest(reason=str(exc))
 
     queue = svc.queue_registry.get_queue(guild_id)
     queue.add(track)

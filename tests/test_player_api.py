@@ -5,13 +5,17 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import threading
 import time
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 # Shared stubs already injected via tests/conftest.py (aiohttp, jwt).
 from tests.conftest import (
     FakeApplication,
     FakeHTTPBadRequest,
+    FakeHTTPConflict,
     FakeHTTPForbidden,
     FakeHTTPServiceUnavailable,
 )
@@ -520,6 +524,44 @@ def _make_request_with_json(guild_id=None, body=None, app_data=None, jwt_payload
 
 
 class TestHandleQueueAdd:
+    def test_disconnected_bot_rejects_before_resolving(self):
+        from bot.api.player import handle_queue_add
+
+        resolver = MagicMock()
+        cog, _, _ = _make_music_cog(vm=_make_vm(is_connected=False))
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "https://youtube.com/watch?v=abc"},
+            app_data={"bot": _make_bot(cog)},
+            jwt_payload={"guild_ids": ["123"]},
+        )
+
+        with pytest.raises(FakeHTTPConflict):
+            asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+
+        resolver.resolve.assert_not_called()
+
+    def test_resolve_runs_outside_event_loop_thread(self):
+        from bot.api.player import handle_queue_add
+
+        resolver = MagicMock()
+        resolver_thread = []
+        resolver.resolve.side_effect = lambda url: (
+            resolver_thread.append(threading.get_ident()) or _make_track("New Song")
+        )
+        cog, _, _ = _make_music_cog(vm=_make_vm())
+        request = _make_request_with_json(
+            guild_id=123,
+            body={"url": "https://youtube.com/watch?v=abc"},
+            app_data={"bot": _make_bot(cog)},
+            jwt_payload={"guild_ids": ["123"]},
+        )
+        event_loop_thread = threading.get_ident()
+
+        asyncio.run(handle_queue_add(request, _resolver_factory=lambda: resolver))
+
+        assert resolver_thread[0] != event_loop_thread
+
     def test_adds_track_and_starts_playback_when_idle(self):
         from bot.api.player import handle_queue_add
 

@@ -109,7 +109,7 @@ class Music(commands.Cog):
             vm.set_on_track_end(self._make_on_track_end(ctx.guild.id))
 
         try:
-            track = self.service.resolver.resolve(query)
+            track = await asyncio.to_thread(self.service.resolver.resolve, query)
         except UnsupportedSourceError:
             await ctx.send(
                 "That URL is not supported. Try searching by song name instead,"

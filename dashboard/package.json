@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "check:guild-picker-a11y": "node check-guild-picker-a11y.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",

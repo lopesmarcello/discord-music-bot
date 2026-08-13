@@ -55,6 +55,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Test dashboard API
+        run: npm run test:api
+
   build-docker:
     name: Validate Docker Builds
     runs-on: ubuntu-latest

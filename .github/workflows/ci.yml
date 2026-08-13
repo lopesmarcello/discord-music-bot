@@ -55,6 +55,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Check search accessibility
+        run: npm run test:search-a11y
+
   build-docker:
     name: Validate Docker Builds
     runs-on: ubuntu-latest

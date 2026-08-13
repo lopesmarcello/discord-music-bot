@@ -86,6 +86,7 @@ export default function SearchBar({ guildId, onAdded }: SearchBarProps) {
           onChange={e => setQuery(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
+          aria-label="Search YouTube"
           placeholder="Search YouTube…"
           disabled={searching}
         />

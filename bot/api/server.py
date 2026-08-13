@@ -18,8 +18,11 @@ async def handle_health(request: "aiohttp.web.Request") -> "aiohttp.web.Response
     import json  # noqa: PLC0415
 
     return aiohttp.web.Response(
-        text=json.dumps({"status": "ok", "bot_ready": bot_ready}),
+        text=json.dumps(
+            {"status": "ok" if bot_ready else "unavailable", "bot_ready": bot_ready}
+        ),
         content_type="application/json",
+        status=200 if bot_ready else 503,
     )
 
 

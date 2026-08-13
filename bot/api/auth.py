@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import secrets
 import urllib.parse
 from datetime import datetime, timezone, timedelta
 from typing import TYPE_CHECKING
@@ -18,6 +19,7 @@ DISCORD_OAUTH_BASE = "https://discord.com/oauth2/authorize"
 DISCORD_TOKEN_URL = "https://discord.com/api/v10/oauth2/token"
 DISCORD_API_BASE = "https://discord.com/api/v10"
 COOKIE_NAME = "session"
+OAUTH_STATE_COOKIE_NAME = "oauth_state"
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +64,17 @@ async def handle_auth_discord(request: "aiohttp.web.Request") -> "aiohttp.web.Re
     guild_id = request.rel_url.query.get("guild_id", "")
     client_id = os.environ.get("DISCORD_CLIENT_ID", "")
     redirect_uri = os.environ.get("DISCORD_REDIRECT_URI", "")
+    nonce = secrets.token_urlsafe(32)
+    state = encode_jwt(
+        {
+            "purpose": "oauth_state",
+            "guild_id": guild_id,
+            "nonce": nonce,
+            "exp": int(
+                (datetime.now(timezone.utc) + timedelta(minutes=10)).timestamp()
+            ),
+        }
+    )
 
     params = urllib.parse.urlencode(
         {
@@ -69,10 +82,20 @@ async def handle_auth_discord(request: "aiohttp.web.Request") -> "aiohttp.web.Re
             "redirect_uri": redirect_uri,
             "response_type": "code",
             "scope": "identify guilds",
-            "state": guild_id,
+            "state": state,
         }
     )
-    raise aiohttp.web.HTTPFound(f"{DISCORD_OAUTH_BASE}?{params}")
+    response = aiohttp.web.HTTPFound(f"{DISCORD_OAUTH_BASE}?{params}")
+    response.set_cookie(
+        OAUTH_STATE_COOKIE_NAME,
+        nonce,
+        httponly=True,
+        max_age=600,
+        path="/auth/callback",
+        samesite="Lax",
+        secure=redirect_uri.startswith("https://"),
+    )
+    raise response
 
 
 async def _fetch_discord_oauth_data(
@@ -139,10 +162,21 @@ async def handle_auth_callback(
 
     dashboard_url = os.environ.get("DASHBOARD_URL", "http://localhost:3000")
     code = request.rel_url.query.get("code", "")
-    guild_id = request.rel_url.query.get("state", "")
+    state_token = request.rel_url.query.get("state", "")
 
     if not code:
         raise aiohttp.web.HTTPFound(f"{dashboard_url}?error=invalid_code")
+
+    try:
+        state = decode_jwt(state_token)
+        nonce = request.cookies.get(OAUTH_STATE_COOKIE_NAME, "")
+        if state.get("purpose") != "oauth_state" or not secrets.compare_digest(
+            state.get("nonce", ""), nonce
+        ):
+            raise ValueError("OAuth state mismatch")
+        guild_id = state.get("guild_id", "")
+    except Exception:  # noqa: BLE001
+        raise aiohttp.web.HTTPFound(f"{dashboard_url}?error=invalid_state")
 
     token_data, user_data, guilds_data = await _fetch_discord_oauth_data(
         code, _http_session_factory
@@ -173,7 +207,15 @@ async def handle_auth_callback(
 
     redirect_url = f"{dashboard_url}?guild={guild_id}" if guild_id else dashboard_url
     response = aiohttp.web.HTTPFound(redirect_url)
-    response.set_cookie(COOKIE_NAME, token, httponly=True, path="/", samesite="Lax")
+    response.set_cookie(
+        COOKIE_NAME,
+        token,
+        httponly=True,
+        path="/",
+        samesite="Lax",
+        secure=os.environ.get("DISCORD_REDIRECT_URI", "").startswith("https://"),
+    )
+    response.del_cookie(OAUTH_STATE_COOKIE_NAME, path="/auth/callback")
     _log.info("User %s authenticated for guild %s", user_data.get("username"), guild_id)
     raise response
 

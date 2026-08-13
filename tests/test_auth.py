@@ -49,6 +49,24 @@ def _make_request(
     return req
 
 
+def _make_callback_request(code: str, guild_id: str):
+    nonce = "test-oauth-nonce"
+    with patch.dict("os.environ", {"JWT_SECRET": "secret"}):
+        state = encode_jwt(
+            {
+                "purpose": "oauth_state",
+                "guild_id": guild_id,
+                "nonce": nonce,
+                "exp": 9999999999,
+            }
+        )
+    return _make_request(
+        path="/auth/callback",
+        cookies={"oauth_state": nonce},
+        query={"code": code, "state": state},
+    )
+
+
 def _make_session_factory(token_data: dict, user_data: dict, guilds_data: list):
     """Return an async context manager factory that simulates aiohttp.ClientSession."""
 
@@ -138,7 +156,7 @@ class TestHandleAuthDiscord:
                 asyncio.run(handle_auth_discord(req))
         assert "discord.com/oauth2/authorize" in exc_info.value.location
 
-    def test_redirect_contains_guild_id_as_state(self):
+    def test_redirect_uses_browser_bound_state(self):
         import pytest
 
         req = _make_request(path="/auth/discord", query={"guild_id": "111222333"})
@@ -150,9 +168,12 @@ class TestHandleAuthDiscord:
         with patch.dict("os.environ", env):
             with pytest.raises(FakeHTTPFound) as exc_info:
                 asyncio.run(handle_auth_discord(req))
-        parsed = urllib.parse.urlparse(exc_info.value.location)
-        params = dict(urllib.parse.parse_qsl(parsed.query))
-        assert params["state"] == "111222333"
+            parsed = urllib.parse.urlparse(exc_info.value.location)
+            params = dict(urllib.parse.parse_qsl(parsed.query))
+            state = decode_jwt(params["state"])
+        assert state["guild_id"] == "111222333"
+        assert state["nonce"] == exc_info.value._cookies["oauth_state"]
+        assert exc_info.value._cookie_options["oauth_state"]["httponly"] is True
 
     def test_redirect_contains_client_id(self):
         import pytest
@@ -167,6 +188,20 @@ class TestHandleAuthDiscord:
             with pytest.raises(FakeHTTPFound) as exc_info:
                 asyncio.run(handle_auth_discord(req))
         assert "my_client_id" in exc_info.value.location
+
+    def test_https_callback_uses_secure_state_cookie(self):
+        import pytest
+
+        req = _make_request(path="/auth/discord", query={})
+        env = {
+            "JWT_SECRET": "secret",
+            "DISCORD_CLIENT_ID": "client123",
+            "DISCORD_REDIRECT_URI": "https://music.example.com/auth/callback",
+        }
+        with patch.dict("os.environ", env):
+            with pytest.raises(FakeHTTPFound) as exc_info:
+                asyncio.run(handle_auth_discord(req))
+        assert exc_info.value._cookie_options["oauth_state"]["secure"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -185,12 +220,32 @@ class TestHandleAuthCallback:
                 asyncio.run(handle_auth_callback(req))
         assert "error=invalid_code" in exc_info.value.location
 
+    def test_rejects_state_not_bound_to_browser_cookie(self):
+        import pytest
+
+        env = {"JWT_SECRET": "secret", "DASHBOARD_URL": "http://localhost:3000"}
+        with patch.dict("os.environ", env):
+            state = encode_jwt(
+                {
+                    "purpose": "oauth_state",
+                    "guild_id": "999",
+                    "nonce": "expected-nonce",
+                    "exp": 9999999999,
+                }
+            )
+            req = _make_request(
+                path="/auth/callback",
+                cookies={"oauth_state": "different-nonce"},
+                query={"code": "valid_code", "state": state},
+            )
+            with pytest.raises(FakeHTTPFound) as exc_info:
+                asyncio.run(handle_auth_callback(req))
+        assert "error=invalid_state" in exc_info.value.location
+
     def test_successful_login_sets_cookie(self):
         import pytest
 
-        req = _make_request(
-            path="/auth/callback", query={"code": "valid_code", "state": "999"}
-        )
+        req = _make_callback_request("valid_code", "999")
         factory = _make_session_factory(
             token_data={"access_token": "discord_token_abc"},
             user_data={"id": "u1", "username": "alice", "avatar": "avatar_hash"},
@@ -208,12 +263,31 @@ class TestHandleAuthCallback:
                 asyncio.run(handle_auth_callback(req, _http_session_factory=factory))
         assert COOKIE_NAME in exc_info.value._cookies
 
+    def test_https_callback_uses_secure_session_cookie(self):
+        import pytest
+
+        req = _make_callback_request("valid_code", "999")
+        factory = _make_session_factory(
+            token_data={"access_token": "discord_token_abc"},
+            user_data={"id": "u1", "username": "alice", "avatar": None},
+            guilds_data=[{"id": "999"}],
+        )
+        env = {
+            "JWT_SECRET": "secret",
+            "DISCORD_CLIENT_ID": "cid",
+            "DISCORD_CLIENT_SECRET": "csecret",
+            "DISCORD_REDIRECT_URI": "https://music.example.com/auth/callback",
+            "DASHBOARD_URL": "https://music.example.com",
+        }
+        with patch.dict("os.environ", env):
+            with pytest.raises(FakeHTTPFound) as exc_info:
+                asyncio.run(handle_auth_callback(req, _http_session_factory=factory))
+        assert exc_info.value._cookie_options[COOKIE_NAME]["secure"] is True
+
     def test_user_not_in_guild_redirects_error(self):
         import pytest
 
-        req = _make_request(
-            path="/auth/callback", query={"code": "valid_code", "state": "999"}
-        )
+        req = _make_callback_request("valid_code", "999")
         factory = _make_session_factory(
             token_data={"access_token": "tok"},
             user_data={"id": "u1", "username": "alice", "avatar": None},
@@ -234,9 +308,7 @@ class TestHandleAuthCallback:
     def test_discord_token_error_redirects_error(self):
         import pytest
 
-        req = _make_request(
-            path="/auth/callback", query={"code": "bad_code", "state": "999"}
-        )
+        req = _make_callback_request("bad_code", "999")
         factory = _make_session_factory(
             token_data={"error": "invalid_grant"},
             user_data={},
@@ -257,10 +329,7 @@ class TestHandleAuthCallback:
     def test_successful_login_jwt_contains_exp_claim(self):
         import pytest
 
-        req = _make_request(
-            path="/auth/callback",
-            query={"code": "valid_code", "state": "999"},
-        )
+        req = _make_callback_request("valid_code", "999")
         factory = _make_session_factory(
             token_data={"access_token": "discord_token_abc"},
             user_data={"id": "u1", "username": "alice", "avatar": "avatar_hash"},
@@ -285,9 +354,7 @@ class TestHandleAuthCallback:
     def test_successful_redirect_contains_guild_id(self):
         import pytest
 
-        req = _make_request(
-            path="/auth/callback", query={"code": "valid_code", "state": "42"}
-        )
+        req = _make_callback_request("valid_code", "42")
         factory = _make_session_factory(
             token_data={"access_token": "tok"},
             user_data={"id": "u1", "username": "bob", "avatar": None},

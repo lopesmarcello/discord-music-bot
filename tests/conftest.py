@@ -25,9 +25,11 @@ class FakeHTTPFound(FakeHTTPException):
         super().__init__(location)
         self.location = location
         self._cookies: dict = {}
+        self._cookie_options: dict = {}
 
     def set_cookie(self, name, value, **kwargs):
         self._cookies[name] = value
+        self._cookie_options[name] = kwargs
 
     def del_cookie(self, name, **kwargs):
         self._cookies.pop(name, None)
